@@ -1,0 +1,8 @@
+Como instalar pydantic para Python 3.7:
+
+C:\Python37\python.exe -m pip install "pydantic<2"
+
+========================================
+Verifica las rutas disponibles:
+http://127.0.0.1:8080/docs
+====================================
