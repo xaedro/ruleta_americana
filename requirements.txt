@@ -1,5 +1,5 @@
 # -- Framework Web y Servidor --
-# El corazón de tu aplicación.
+# El corazon de tu aplicacion.
 fastapi
 uvicorn
 
@@ -8,11 +8,11 @@ uvicorn
 websockets
 httptools
 
-# -- Librerías Esenciales de FastAPI --
-# Pydantic es para la validación de datos, starlette es el toolkit subyacente.
+# -- Librerias Esenciales de FastAPI --
+# Pydantic es para la validacion de datos, starlette es el toolkit subyacente.
 pydantic
 starlette
 
-# -- Librería Opcional (pero probablemente necesaria) --
+# -- Libreria Opcional (pero probablemente necesaria) --
 # Si tu API recibe datos de formularios o subida de archivos.
 python-multipart
