@@ -1,38 +1,59 @@
 # main.py
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
-from typing import List
+from typing import cast, List
 import json
 import os
 
 import logging
-from typing import cast
 
-# 1. Creamos la clase de filtro mejorada
+# ==================== CÓDIGO UNIFICADO PARA FILTRAR LOGS ====================
+
+# 1. Definimos UNA SOLA clase de filtro, la más flexible que hemos creado.
 class EndpointFilter(logging.Filter):
-    def __init__(self, path: str, *args, **kwargs):
+    """
+    Filtra los logs de acceso de Uvicorn para rutas específicas.
+    """
+    def __init__(self, paths_to_filter: List[str], *args, **kwargs):
+        """
+        Inicializa el filtro con una lista de inicios de rutas que se deben silenciar.
+        Ejemplo: ["/live.jpg", "/upload"]
+        """
         super().__init__(*args, **kwargs)
-        # Guardamos la ruta que queremos filtrar
-        self._path = path
+        # Guardamos la lista de rutas a silenciar
+        self._paths = paths_to_filter
 
     def filter(self, record: logging.LogRecord) -> bool:
-        # Los argumentos del log de acceso de uvicorn son una tupla.
-        # El tercer elemento (índice 2) es la ruta de la petición (ej: "/fecha_hora/").
-        # Hacemos una comprobación segura para evitar errores de índice.
+        """
+        Devuelve False (bloquear) si la ruta del log comienza con alguna de las rutas
+        en self._paths. De lo contrario, devuelve True (permitir).
+        """
+        # Verificamos que los argumentos del log de acceso sean válidos
         if len(record.args) >= 3:
-            # `cast` es solo para ayudar al autocompletado del editor, no es funcionalmente necesario.
+            # Obtenemos el path de la petición, ej: "/live.jpg?t=123"
             path = cast(str, record.args[2])
-            if self._path in path:
-                # Si la ruta que queremos filtrar está en la ruta de la petición,
-                # devolvemos False para bloquear el log.
-                return False
+            
+            # Revisamos si la ruta de la petición comienza con alguna de las rutas a filtrar
+            for p in self._paths:
+                if path.startswith(p):
+                    return False  # Bloquea este log si hay una coincidencia
+
+        # Para cualquier otro log que no coincida, permite que pase.
         return True
 
-# 2. Obtenemos el logger de acceso y le añadimos una instancia de nuestro filtro.
-# Le decimos que filtre cualquier log que contenga "/fecha_hora/".
-logging.getLogger("uvicorn.access").addFilter(EndpointFilter(path="/fecha_hora/"))
+# 2. Creamos UNA SOLA lista con TODAS las rutas que queremos silenciar.
+paths_to_silence = [
+    "/live.jpg",
+    "/upload",
+    "/fecha_hora/"  # Añadimos la ruta de fecha/hora aquí
+]
 
+# 3. Obtenemos el logger de acceso de Uvicorn.
+uvicorn_access_logger = logging.getLogger("uvicorn.access")
+
+# 4. Le añadimos UNA SOLA instancia de nuestro filtro, pasándole la lista completa.
+uvicorn_access_logger.addFilter(EndpointFilter(paths_to_filter=paths_to_silence))
 
 
 app = FastAPI()
@@ -85,21 +106,36 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # --- Endpoints HTTP ---
+# ==================== VERSIÓN UNIFICADA DEL ENDPOINT RAÍZ ====================
 @app.get("/")
-async def get_index():
+async def read_root():
     """
-    Sirve el archivo index.html como respuesta a la petición raíz.
+    Sirve el archivo HTML principal. 
+    Para cambiar el archivo a servir para pruebas, simplemente comenta
+    la línea actual y descomenta la que desees usar.
     """
-    # Define la ruta al archivo HTML.
-    # Usar os.path.join es una buena práctica para que funcione en cualquier sistema operativo.
-    html_file_path = os.path.join(os.path.dirname(__file__), "index.html")
     
-    # Comprueba si el archivo existe para evitar errores 500 si se elimina por accidente.
+    # --- Archivos de prueba (descomenta el que quieras usar) ---
+    # file_to_serve = "index.html"
+    # file_to_serve = "webrtc_capture.html"
+    # file_to_serve = "webrtc_capture2.html"
+    # file_to_serve = "recorte.html"
+    file_to_serve = "recorte2.html" # <-- Archivo activo actualmente
+
+    # --- Lógica para servir el archivo ---
+    
+    # Construye la ruta completa al archivo de forma segura
+    # os.path.dirname(__file__) obtiene la carpeta donde se encuentra este script (main.py)
+    html_file_path = os.path.join(os.path.dirname(__file__), file_to_serve)
+    
+    # Comprueba si el archivo realmente existe antes de intentar servirlo
     if os.path.exists(html_file_path):
         return FileResponse(html_file_path)
     else:
-        return {"error": "index.html not found"}, 404
-async def get(): return HTMLResponse(html)
+        # Si el archivo no se encuentra, devuelve un error 404 claro.
+        raise HTTPException(status_code=404, detail=f"Archivo '{file_to_serve}' no encontrado.")
+
+# ==============================================================================
 
 
 @app.post("/send/")
@@ -171,3 +207,29 @@ async def websocket_blender(websocket: WebSocket):
     except WebSocketDisconnect:
         print("--> Conexión WebSocket de Blender cerrada.")
         manager.disconnect_blender(websocket)
+
+# Una variable global para almacenar la imagen más reciente en memoria
+latest_image_bytes = None
+SECRET_KEY = "tu_clave_secreta_super_dificil" # Debe ser la misma que en el script capturador
+
+@app.post("/upload")
+async def upload_image(request: Request, file: UploadFile = File(...)):
+    global latest_image_bytes
+    # Medida de seguridad simple
+    if request.headers.get("x-secret-key") != SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Clave secreta inválida")
+    
+    latest_image_bytes = await file.read()
+    return {"message": "Imagen recibida"}
+
+@app.get("/live.jpg")
+async def get_live_image():
+    if latest_image_bytes is None:
+        # Podrías devolver una imagen por defecto de "Offline"
+        raise HTTPException(status_code=404, detail="No hay imagen disponible")
+    
+    # Devuelve los bytes de la imagen con el tipo de contenido correcto
+    return Response(content=latest_image_bytes, media_type="image/jpeg")
+
+# Endpoint para servir tu página HTML
+
