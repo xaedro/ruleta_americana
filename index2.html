@@ -49,86 +49,111 @@
 
 <script>
     // ======================================================================
-    // --- LÓGICA DEL STREAM DE IMÁGENES (WEBRTC) ---
-    // ======================================================================
+	// --- LÓGICA DEL STREAM DE IMÁGENES (USANDO requestAnimationFrame) ---
+	// ======================================================================
 
-    const startButton = document.getElementById('startButton');
-    const previewVideo = document.getElementById('preview');
-    const canvas = document.getElementById('canvas');
-    const liveStreamImg = document.getElementById('live-stream');
+	const startButton = document.getElementById('startButton');
+	const previewVideo = document.getElementById('preview');
+	const canvas = document.getElementById('canvas');
+	const liveStreamImg = document.getElementById('live-stream');
 
-    const UPLOAD_URL = '/upload';
-    const SECRET_KEY = 'tu_clave_secreta_super_dificil';
-    const FPS = 10;
-    
-    // Tus valores de recorte personalizados
+	const UPLOAD_URL = '/upload';
+	const SECRET_KEY = 'tu_clave_secreta_super_dificil';
+	const FPS = 10; // Seguiremos intentando apuntar a 10 FPS
+
+	// Tus valores de recorte
 	const cropX = 815;
 	const cropY = 107;
 	const cropWidth = 702;
 	const cropHeight = 391;
 
-    let captureIntervalId = null; // Para poder detener el stream si es necesario
+	let isStreaming = false;
+	let lastFrameTime = 0;
+	const frameInterval = 1000 / FPS; // Tiempo que debe pasar entre frames en ms
 
-    startButton.onclick = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-            previewVideo.srcObject = stream;
-            
-            previewVideo.onloadedmetadata = () => {
-                startButton.disabled = true;
-                startButton.textContent = "STREAMING EN VIVO...";
-                
-                // Inicia el bucle de streaming
-                captureIntervalId = setInterval(captureAndStreamFrame, 1000 / FPS);
-            };
-        } catch (err) { 
-            console.error("Error al iniciar la captura:", err); 
-        }
-    };
+	startButton.onclick = async () => {
+		try {
+			const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+			previewVideo.srcObject = stream;
+			
+			previewVideo.onloadedmetadata = () => {
+				startButton.disabled = true;
+				startButton.textContent = "STREAMING EN VIVO...";
+				isStreaming = true;
+				
+				// Inicia el bucle de animación
+				requestAnimationFrame(gameLoop);
+			};
+		} catch (err) { 
+			console.error("Error al iniciar la captura:", err); 
+			// Lógica para resetear el botón si el usuario cancela la selección de pantalla
+			startButton.disabled = false;
+			startButton.textContent = "INICIAR STREAM";
+			isStreaming = false;
+		}
+	};
 
-    async function captureAndStreamFrame() {
-        try {
-            const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
-            
-            canvas.width = imageBitmap.width;
-            canvas.height = imageBitmap.height;
-            
-            const context = canvas.getContext('2d');
-            context.drawImage(imageBitmap, 0, 0);
-            imageBitmap.close();
+	// El "Game Loop" que controla tanto la captura como el refresco.
+	function gameLoop(currentTime) {
+		if (!isStreaming) return; // Si se detuvo el stream, para el bucle.
 
-            canvas.toBlob((blob) => {
-                if (!blob) return;
-                const formData = new FormData();
-                formData.append('file', blob, 'live.jpg');
-                
-                fetch(UPLOAD_URL, {
-                    method: 'POST',
-                    headers: { 'X-Secret-Key': SECRET_KEY },
-                    body: formData
-                })
-                .catch(err => console.error("Error de red al subir frame:", err)); // Solo logueamos el error de subida
+		// Pide al navegador que vuelva a llamar a esta función en el próximo frame
+		requestAnimationFrame(gameLoop);
 
-            }, 'image/jpeg', 0.50); // Calidad ajustada a 50% como un buen punto de partida
+		// Calcula el tiempo pasado desde el último frame
+		const deltaTime = currentTime - lastFrameTime;
 
-        } catch (error) {
-            console.warn("No se pudo procesar el fotograma. ¿El usuario detuvo el stream?", error.name);
-            // Si el usuario detiene el stream, limpiamos el intervalo para no seguir intentando
-            if (captureIntervalId) {
-                clearInterval(captureIntervalId);
-                startButton.disabled = false;
-                startButton.textContent = "INICIAR STREAM";
-            }
-        }
-    }
+		// Si no ha pasado suficiente tiempo para alcanzar nuestros FPS deseados, no hacemos nada.
+		if (deltaTime < frameInterval) {
+			return;
+		}
 
-    // Un bucle separado para refrescar la imagen es más simple y resiliente
-    setInterval(() => {
-        // Solo refresca si el stream está activo (botón deshabilitado)
-        if (startButton.disabled) {
-            liveStreamImg.src = '/live.jpg?t=' + new Date().getTime();
-        }
-    }, 1000 / FPS);
+		// Ha pasado suficiente tiempo, actualizamos el tiempo del último frame
+		lastFrameTime = currentTime;
+		
+		// --- Lógica de Captura y Subida ---
+		captureAndStreamFrame();
+
+		// --- Lógica de Refresco de Imagen ---
+		// Usamos el truco del timestamp para evitar la caché del navegador
+		liveStreamImg.src = '/live.jpg?t=' + new Date().getTime();
+	}
+
+	async function captureAndStreamFrame() {
+		try {
+			// Usamos createImageBitmap para un mejor rendimiento
+			const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
+			
+			canvas.width = imageBitmap.width;
+			canvas.height = image-bitmap.height;
+			
+			const context = canvas.getContext('2d');
+			context.drawImage(imageBitmap, 0, 0);
+			imageBitmap.close(); // Liberar memoria
+
+			canvas.toBlob((blob) => {
+				if (!blob) return;
+				const formData = new FormData();
+				formData.append('file', blob, 'live.jpg');
+				
+				fetch(UPLOAD_URL, {
+					method: 'POST',
+					headers: { 'X-Secret-Key': SECRET_KEY },
+					body: formData
+				}).catch(err => console.error("Error de red al subir frame:", err));
+
+			}, 'image/jpeg', 0.50);
+
+		} catch (error) {
+			console.warn("No se pudo procesar el fotograma:", error.name);
+			// Si hay un error, como que el usuario detuvo el stream, paramos el bucle
+			if (isStreaming) {
+				isStreaming = false;
+				startButton.disabled = false;
+				startButton.textContent = "INICIAR STREAM";
+			}
+		}
+	}
 
 
     // ======================================================================
