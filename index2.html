@@ -125,7 +125,7 @@
 			const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
 			
 			canvas.width = imageBitmap.width;
-			canvas.height = image-bitmap.height;
+			canvas.height = imageBitmap.height;
 			
 			const context = canvas.getContext('2d');
 			context.drawImage(imageBitmap, 0, 0);
