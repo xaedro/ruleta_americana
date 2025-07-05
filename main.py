@@ -117,10 +117,11 @@ async def read_root():
     
     # --- Archivos de prueba (descomenta el que quieras usar) ---
     # file_to_serve = "index.html"
+    file_to_serve = "index2.html"
     # file_to_serve = "webrtc_capture.html"
     # file_to_serve = "webrtc_capture2.html"
     # file_to_serve = "recorte.html"
-    file_to_serve = "recorte2.html" # <-- Archivo activo actualmente
+    # file_to_serve = "recorte2.html" # <-- Archivo activo actualmente
 
     # --- Lógica para servir el archivo ---
     
