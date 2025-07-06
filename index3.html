@@ -1223,8 +1223,8 @@ ws.onmessage = function(event) {
 
 		// Definimos un tamaño de salida más pequeño. 
 		// Mantiene la proporción de 702x391 (aprox 16:9)
-		const outputWidth = 480; // Antes era 702
-		const outputHeight = 267; // Antes era 391
+		const outputWidth = 702; //480; // Antes era 702
+		const outputHeight = 391; //267; // Antes era 391
 
 		try {
 			// Capturamos el área original
@@ -1241,7 +1241,7 @@ ws.onmessage = function(event) {
 			
 			// Comprimimos la imagen reescalada (y más pequeña)
 			// Podemos probar a subir un poco la calidad ya que el tamaño en píxeles es menor
-			const base64Image = canvas.toDataURL('image/jpeg', 0.50).split(',')[1]; // Subimos calidad a 0.50
+			const base64Image = canvas.toDataURL('image/jpeg', 0.25).split(',')[1]; // Subimos calidad a 0.50
 
 			ws.send(JSON.stringify({
 				type: "video_frame",
