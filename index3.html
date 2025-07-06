@@ -826,12 +826,23 @@
         streamPlaceholder.style.display = 'none';
     }
 
-    function showPlaceholder(message) {
-        liveStreamImg.style.display = 'none';
-        liveStreamImg.src = '';
-        streamPlaceholder.style.display = 'block';
-        streamPlaceholder.textContent = message;
-    }
+    // VERSIÓN MEJORADA DE showPlaceholder
+	function showPlaceholder(message) {
+		// 1. Aseguramos que la transmisión esté marcada como detenida
+		isStreaming = false;
+
+		// 2. Ocultamos la imagen y mostramos el placeholder
+		liveStreamImg.style.display = 'none';
+		streamPlaceholder.style.display = 'block';
+
+		// 3. Limpiamos la fuente de la imagen. A veces, usar un "pixel transparente"
+		// es más efectivo para forzar al navegador a limpiar que usar una cadena vacía.
+		liveStreamImg.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='; // Un GIF transparente de 1x1 pixel
+		
+		// 4. Actualizamos el mensaje
+		streamPlaceholder.textContent = message;
+	}
+
     
     showPlaceholder("Presiona 'INICIAR TRANSMISIÓN' para compartir tu pantalla.");
 
@@ -925,35 +936,40 @@
 
         ws.onopen = () => console.log("Conexión WebSocket establecida.");
 
-        ws.onmessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
-                
-                if (data.type === 'live_frame') {
-                    showStream();
-                    liveStreamImg.src = 'data:image/jpeg;base64,' + data.data;
-                } else if (data.type === 'stream_ended') {
-                    console.log("El stream ha finalizado. Mostrando placeholder.");
-                    showPlaceholder("La transmisión ha finalizado.");
-                } else if (data.type === 'juego_numero') {
-                    juegoNumeroElem.textContent = 'Juego Número: ' + data.payload;
-                } else if (data.type === 'fecha_hora') {
-                    fechaHoraElem.textContent = 'Fecha y Hora: ' + data.payload;
-                } else {
-                    console.log("Mensaje JSON desconocido recibido:", data);
-                }
+        // VERSIÓN MEJORADA DE ws.onmessage
+ws.onmessage = function(event) {
+    try {
+			const data = JSON.parse(event.data);
+			
+			// El nuevo `if` es más robusto. Solo procesamos frames SI estamos en modo streaming.
+			if (data.type === 'live_frame' && isStreaming) {
+				showStream();
+				liveStreamImg.src = 'data:image/jpeg;base64,' + data.data;
+			
+			} else if (data.type === 'stream_ended') {
+				console.log("El stream ha finalizado. Mostrando placeholder.");
+				// Le pasamos un mensaje específico para los espectadores
+				showPlaceholder("La transmisión ha finalizado.");
+			
+			} else if (data.type === 'juego_numero') {
+				juegoNumeroElem.textContent = 'Juego Número: ' + data.payload;
+			} else if (data.type === 'fecha_hora') {
+				fechaHoraElem.textContent = 'Fecha y Hora: ' + data.payload;
+			} else {
+				console.log("Mensaje JSON desconocido recibido:", data);
+			}
 
-            } catch (e) {
-                const messageText = event.data;
-                if (messageText.startsWith("Usuarios conectados:")) {
-                    usuariosElem.textContent = messageText;
-                } else {
-                    const li = document.createElement('li');
-                    li.textContent = messageText;
-                    messagesElem.appendChild(li);
-                }
-            }
-        };
+		} catch (e) {
+			const messageText = event.data;
+			if (messageText.startsWith("Usuarios conectados:")) {
+				usuariosElem.textContent = messageText;
+			} else {
+				const li = document.createElement('li');
+				li.textContent = messageText;
+				messagesElem.appendChild(li);
+			}
+		}
+	};
 
         ws.onclose = () => {
             console.log(`Conexión WebSocket cerrada. Reconectando en ${reconnectInterval / 1000}s...`);
