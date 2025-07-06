@@ -300,7 +300,6 @@ class ConnectionManager:
             print("El streamer se ha desconectado.")
             streamer_ws = None
             streamer_is_active = False
-            # Notificamos a todos los demás que el stream ha terminado
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 loop.create_task(self.broadcast_to_users_json({"type": "stream_ended"}))
@@ -309,7 +308,6 @@ class ConnectionManager:
             del self.apuestas_usuarios[websocket]
 
     async def broadcast_to_users_text(self, message: str):
-        # Hacemos una copia de la lista para iterar por si se modifica durante el bucle
         for connection in list(self.user_connections):
             try:
                 await connection.send_text(message)
