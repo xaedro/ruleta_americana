@@ -316,7 +316,18 @@ class ConnectionManager:
 
     async def broadcast_to_users_json(self, data: dict):
         await self.broadcast_to_users_text(json.dumps(data))
-        
+    
+    # ¡NUEVA FUNCIÓN!
+    async def broadcast_to_others_json(self, data: dict, sender: WebSocket):
+        message = json.dumps(data)
+        # Iteramos sobre una copia de la lista por si hay desconexiones
+        for connection in list(self.user_connections):
+            if connection != sender: # La condición clave: no enviar al remitente
+                try:
+                    await connection.send_text(message)
+                except:
+                    self.disconnect_user(connection)
+    
     async def connect_blender(self, websocket: WebSocket):
         await websocket.accept()
         if not self.blender_connections:
@@ -348,7 +359,7 @@ async def read_root():
         return FileResponse(html_file_path)
     else:
         raise HTTPException(status_code=404, detail="Archivo 'index3.html' no encontrado.")
-
+"""
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...), x_secret_key: Optional[str] = Header(None)):
     if not streamer_is_active:
@@ -361,7 +372,7 @@ async def upload_image(file: UploadFile = File(...), x_secret_key: Optional[str]
     payload = {"type": "live_frame", "data": base64_image}
     await manager.broadcast_to_users_json(payload)
     return {"status": "ok"}
-
+"""
 @app.post("/stream_ended")
 async def notify_stream_ended(x_secret_key: Optional[str] = Header(None)):
     global streamer_ws, streamer_is_active
@@ -438,7 +449,16 @@ async def websocket_users(websocket: WebSocket):
                     streamer_is_active = True
                     await manager.broadcast_to_users_json({"type": "stream_started"})
                     print("El streamer ha iniciado la transmisión.")
-
+            # --- INICIO DE LA MODIFICACIÓN ---
+            elif msg_type == "video_frame":
+                # Solo el streamer puede enviar fotogramas de video
+                if websocket == streamer_ws and streamer_is_active:
+                    # Preparamos el payload que recibirán los espectadores
+                    payload = {"type": "live_frame", "data": data.get("data")}
+                    # Usamos la nueva función para retransmitir a todos los demás
+                    await manager.broadcast_to_others_json(payload, sender=websocket)
+            # --- FIN DE LA MODIFICACIÓN ---
+            
             elif "nombre" in data and "apuesta" in data:
                 manager.apuestas_usuarios[websocket] = data
                 await manager.send_to_blender(f"apuesta:{data_str}")

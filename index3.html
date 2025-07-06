@@ -1156,7 +1156,8 @@ ws.onmessage = function(event) {
         lastFrameTime = currentTime;
         captureAndStreamFrame();
     }
-
+	
+	/*
     async function captureAndStreamFrame() {
         try {
             const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
@@ -1179,6 +1180,35 @@ ws.onmessage = function(event) {
             console.warn("No se pudo procesar el fotograma:", error.name);
         }
     }
+	*/
+	
+	async function captureAndStreamFrame() {
+		if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+		try {
+			const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
+			canvas.width = imageBitmap.width;
+			canvas.height = imageBitmap.height;
+			const context = canvas.getContext('2d');
+			context.drawImage(imageBitmap, 0, 0);
+			imageBitmap.close();
+			
+			// Obtenemos la imagen como Base64 directamente del canvas
+			const base64Image = canvas.toDataURL('image/jpeg', 0.40).split(',')[1];
+
+			// Enviamos el frame a través del WebSocket
+			ws.send(JSON.stringify({
+				type: "video_frame",
+				data: base64Image
+			}));
+
+		} catch (error) {
+			// Si el video está cerrado, createImageBitmap falla. Lo ignoramos.
+			if (error.name !== 'InvalidStateError') {
+				 console.warn("No se pudo procesar el fotograma:", error.name);
+			}
+		}
+	}
 
     function connectWebSocket() {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
