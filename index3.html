@@ -1096,7 +1096,7 @@ ws.onmessage = function(event) {
     let userRole = "viewer";
     let isStreaming = false;
     //let lastFrameTime = 0;
-    let streamIntervalId = null;
+    //let streamIntervalId = null;
     const frameInterval = 1000 / FPS;
     
     function showStream() {
@@ -1136,8 +1136,7 @@ ws.onmessage = function(event) {
             const videoTrack = stream.getVideoTracks()[0];
             videoTrack.onended = () => {
                 isStreaming = false;
-                // --- AÑADIR ESTA LÍNEA ---
-                if (streamIntervalId) clearInterval(streamIntervalId); 
+                //if (streamIntervalId) clearInterval(streamIntervalId); 
                 fetch(STREAM_ENDED_URL, { method: 'POST', headers: { 'X-Secret-Key': SECRET_KEY } });
             };
 
@@ -1145,8 +1144,9 @@ ws.onmessage = function(event) {
                 isStreaming = true;
                 //requestAnimationFrame(gameLoop);
                 // --- NUEVO CÓDIGO ---
-                if (streamIntervalId) clearInterval(streamIntervalId); // Limpiamos cualquier intervalo anterior
-                streamIntervalId = setInterval(captureAndStreamFrame, frameInterval); // 1000ms / 10 FPS = 100ms
+                //if (streamIntervalId) clearInterval(streamIntervalId); // Limpiamos cualquier intervalo anterior
+                //streamIntervalId = setInterval(captureAndStreamFrame, frameInterval); // 1000ms / 10 FPS = 100ms
+				streamLoop(); 
             };
         } catch (err) {
             console.error("Error al iniciar captura:", err.name);
@@ -1218,6 +1218,22 @@ ws.onmessage = function(event) {
 	}
 	*/
 	
+	function streamLoop() {
+		// Si la variable isStreaming es false, el bucle se detiene solo.
+		if (!isStreaming) return; 
+
+		// 1. Hacemos el trabajo de capturar y enviar.
+		captureAndStreamFrame().then(() => {
+			// 2. Una vez que el trabajo está HECHO, programamos la SIGUIENTE llamada.
+			setTimeout(streamLoop, frameInterval);
+		}).catch(err => {
+			// Si hay un error, también programamos la siguiente llamada para no detener el stream.
+			console.error("Error en el ciclo de stream:", err);
+			setTimeout(streamLoop, frameInterval);
+		});
+	}
+	
+	/*
 	async function captureAndStreamFrame() {
 		if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
@@ -1254,6 +1270,38 @@ ws.onmessage = function(event) {
 			}
 		}
 	}
+	*/
+	async function captureAndStreamFrame() {
+		// Esta función ahora es un 'worker' que solo hace una cosa:
+		// capturar y enviar UN frame.
+		if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+		const outputWidth = 480;
+		const outputHeight = 267;
+
+		try {
+			const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
+			canvas.width = outputWidth;
+			canvas.height = outputHeight;
+			const context = canvas.getContext('2d');
+			context.drawImage(imageBitmap, 0, 0, outputWidth, outputHeight);
+			imageBitmap.close();
+			
+			const base64Image = canvas.toDataURL('image/jpeg', 0.40).split(',')[1]; // Podemos bajar la calidad para la prueba
+
+			ws.send(JSON.stringify({
+				type: "video_frame",
+				data: base64Image
+			}));
+		} catch (error) {
+			if (error.name !== 'InvalidStateError') {
+				 console.warn("No se pudo procesar el fotograma:", error.name);
+			}
+			// Lanzamos el error para que el .catch() en streamLoop lo maneje
+			throw error; 
+		}
+	}
+
     function connectWebSocket() {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsHost = window.location.host;
@@ -1296,8 +1344,6 @@ ws.onmessage = function(event) {
                         break;
                     case 'stream_ended':
                         isStreaming = false;
-                        // --- AÑADIR ESTA LÍNEA ---
-                        if (streamIntervalId) clearInterval(streamIntervalId);
                         
                         if (userRole === 'streamer') {
                             showPlaceholder("La transmisión ha finalizado. Puedes iniciar una nueva.");
