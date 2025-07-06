@@ -399,6 +399,8 @@ async def numero_caido(evento: NumeroCaido):
 # --- ENDPOINTS WEBSOCKET ---
 @app.websocket("/ws/users")
 async def websocket_users(websocket: WebSocket):
+    global streamer_ws, streamer_is_active
+    
     await manager.connect_user(websocket)
     try:
         while True:
@@ -407,7 +409,6 @@ async def websocket_users(websocket: WebSocket):
             msg_type = data.get("type")
 
             if msg_type == "login":
-                global streamer_ws
                 
                 username = data.get("name", "").lower()
                 if username == STREAMER_USERNAME and streamer_ws is None:
@@ -422,7 +423,6 @@ async def websocket_users(websocket: WebSocket):
                     await websocket.send_text(json.dumps({"type": "stream_status", "active": streamer_is_active}))
 
             elif msg_type == "start_stream":
-                global streamer_is_active
                 
                 if websocket == streamer_ws and not streamer_is_active:
                     streamer_is_active = True
