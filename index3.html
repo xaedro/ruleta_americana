@@ -64,7 +64,8 @@
     let isStreaming = false;
     let lastFrameTime = 0;
     const frameInterval = 1000 / FPS;
-
+	
+	/*
     startButton.onclick = async () => {
         try {
             const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
@@ -83,7 +84,45 @@
             isStreaming = false;
         }
     };
+	*/
+	// VERSIÓN MEJORADA Y OPTIMIZADA
+	startButton.onclick = async () => {
+		try {
+			const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+			previewVideo.srcObject = stream;
 
+			// --- LA OPTIMIZACIÓN CLAVE ---
+			// Obtenemos la pista de video del stream
+			const videoTrack = stream.getVideoTracks()[0];
+			
+			// Le decimos al navegador: "Cuando esta pista se vuelva inactiva
+			// (porque el usuario hizo clic en 'Dejar de compartir'), ejecuta esta función".
+			videoTrack.onended = () => {
+				console.log("El usuario ha detenido la compartición de pantalla.");
+				isStreaming = false;
+				startButton.disabled = false;
+				startButton.textContent = "INICIAR STREAM";
+				previewVideo.srcObject = null; // Limpiamos el objeto de video
+				// El bucle gameLoop se detendrá automáticamente en la siguiente iteración
+				// porque isStreaming es ahora false.
+			};
+			// -----------------------------
+			
+			previewVideo.onloadedmetadata = () => {
+				startButton.disabled = true;
+				startButton.textContent = "STREAMING EN VIVO...";
+				isStreaming = true;
+				requestAnimationFrame(gameLoop);
+			};
+		} catch (err) { 
+			// Este catch ahora solo se activará si el usuario cancela
+			// la ventana de selección de pantalla inicial.
+			console.error("El usuario canceló la selección de pantalla o hubo un error:", err.name); 
+			startButton.disabled = false;
+			startButton.textContent = "INICIAR STREAM";
+			isStreaming = false;
+		}
+	};
     function gameLoop(currentTime) {
         if (!isStreaming) return;
         requestAnimationFrame(gameLoop);
