@@ -54,7 +54,7 @@
 
     const UPLOAD_URL = '/upload';
     const SECRET_KEY = 'tu_clave_secreta_super_dificil';
-    const FPS = 15; // Puedes probar con FPS más altos ahora, como 15 o 20
+    const FPS = 10; // Puedes probar con FPS más altos ahora, como 15 o 20
 
 	const cropX = 815;
 	const cropY = 107;
@@ -155,7 +155,7 @@
                     body: formData
                 }).catch(err => console.error("Error de red al subir frame:", err));
 
-            }, 'image/jpeg', 0.50);
+            }, 'image/jpeg', 0.25);
 
         } catch (error) {
             console.warn("No se pudo procesar el fotograma:", error.name);
