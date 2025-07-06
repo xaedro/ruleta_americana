@@ -420,6 +420,16 @@ async def websocket_users(websocket: WebSocket):
                     if username == STREAMER_USERNAME:
                         print(f"Usuario '{username}' intentó iniciar sesión, pero el rol ya está ocupado.")
                     await websocket.send_text(json.dumps({"type": "login_success", "role": role}))
+                    # --- INICIO DE LA CORRECCIÓN ---
+                    # Si el stream ya está activo cuando el usuario se loguea,
+                    # le enviamos el evento para que inicie la visualización.
+                    if streamer_is_active:
+                        await websocket.send_text(json.dumps({"type": "stream_started"}))
+                    else:
+                        # Si no, le informamos del estado actual (inactivo).
+                        await websocket.send_text(json.dumps({"type": "stream_status", "active": False}))
+                    # --- FIN DE LA CORRECCIÓN ---
+                    
                     await websocket.send_text(json.dumps({"type": "stream_status", "active": streamer_is_active}))
 
             elif msg_type == "start_stream":

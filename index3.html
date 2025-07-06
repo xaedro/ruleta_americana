@@ -1203,9 +1203,19 @@ ws.onmessage = function(event) {
                         }
                         break;
                     case 'stream_status':
+                        if (data.active) {
+                            // En lugar de solo mostrar un placeholder,
+                            // activamos el stream directamente.
+                            showStream(); 
+                        } else { 
+                            showPlaceholder("Esperando que el streamer inicie la transmisión..."); 
+                        }
+                        break;
+                        /*
                         if(data.active) { showPlaceholder("Transmisión en curso..."); }
                         else { showPlaceholder("Esperando que el streamer inicie la transmisión..."); }
                         break;
+                        */
                     case 'stream_started':
                         showStream();
                         if (userRole === 'streamer') { startScreenCapture(); }
