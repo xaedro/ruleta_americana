@@ -271,7 +271,6 @@ uvicorn_access_logger.addFilter(EndpointFilter(paths_to_filter=paths_to_silence)
 # --- CONFIGURACIÓN Y ESTADO GLOBAL ---
 SECRET_KEY = "tu_clave_secreta_super_dificil"
 STREAMER_USERNAME = "mario"
-
 streamer_ws: Optional[WebSocket] = None
 streamer_is_active = False
 
@@ -301,14 +300,17 @@ class ConnectionManager:
             print("El streamer se ha desconectado.")
             streamer_ws = None
             streamer_is_active = False
+            # Notificamos a todos los demás que el stream ha terminado
             loop = asyncio.get_event_loop()
-            loop.create_task(self.broadcast_to_users_json({"type": "stream_ended"}))
+            if loop.is_running():
+                loop.create_task(self.broadcast_to_users_json({"type": "stream_ended"}))
 
         if websocket in self.apuestas_usuarios:
             del self.apuestas_usuarios[websocket]
 
     async def broadcast_to_users_text(self, message: str):
-        for connection in self.user_connections:
+        # Hacemos una copia de la lista para iterar por si se modifica durante el bucle
+        for connection in list(self.user_connections):
             try:
                 await connection.send_text(message)
             except:
@@ -319,16 +321,21 @@ class ConnectionManager:
         
     async def connect_blender(self, websocket: WebSocket):
         await websocket.accept()
-        if not self.blender_connections: self.blender_connections.append(websocket)
-        else: print("Advertencia: Se intentó conectar un segundo cliente de Blender.")
+        if not self.blender_connections:
+            self.blender_connections.append(websocket)
+        else:
+            print("Advertencia: Se intentó conectar un segundo cliente de Blender.")
     
     def disconnect_blender(self, websocket: WebSocket):
-        if websocket in self.blender_connections: self.blender_connections.remove(websocket)
+        if websocket in self.blender_connections:
+            self.blender_connections.remove(websocket)
 
     async def send_to_blender(self, message: str):
         for connection in self.blender_connections:
-            try: await connection.send_text(message)
-            except: self.disconnect_blender(connection)
+            try:
+                await connection.send_text(message)
+            except:
+                self.disconnect_blender(connection)
     
     async def send_personal_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
@@ -350,6 +357,7 @@ async def upload_image(file: UploadFile = File(...), x_secret_key: Optional[str]
         raise HTTPException(status_code=403, detail="No hay ningún stream activo actualmente.")
     if x_secret_key != SECRET_KEY:
         raise HTTPException(status_code=403, detail="Clave secreta inválida")
+    
     image_bytes = await file.read()
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
     payload = {"type": "live_frame", "data": base64_image}
@@ -359,11 +367,14 @@ async def upload_image(file: UploadFile = File(...), x_secret_key: Optional[str]
 @app.post("/stream_ended")
 async def notify_stream_ended(x_secret_key: Optional[str] = Header(None)):
     global streamer_ws, streamer_is_active
+    
     if x_secret_key != SECRET_KEY:
         raise HTTPException(status_code=403, detail="Clave secreta inválida")
+    
     streamer_ws = None
     streamer_is_active = False
     await manager.broadcast_to_users_json({"type": "stream_ended"})
+    print("El stream ha finalizado por notificación.")
     return {"status": "ok"}
 
 @app.post("/send/")
@@ -399,8 +410,8 @@ async def websocket_users(websocket: WebSocket):
 
             if msg_type == "login":
                 global streamer_ws
-                username = data.get("name", "").lower()
                 
+                username = data.get("name", "").lower()
                 if username == STREAMER_USERNAME and streamer_ws is None:
                     streamer_ws = websocket
                     await websocket.send_text(json.dumps({"type": "login_success", "role": "streamer"}))
@@ -414,6 +425,7 @@ async def websocket_users(websocket: WebSocket):
 
             elif msg_type == "start_stream":
                 global streamer_is_active
+                
                 if websocket == streamer_ws and not streamer_is_active:
                     streamer_is_active = True
                     await manager.broadcast_to_users_json({"type": "stream_started"})
