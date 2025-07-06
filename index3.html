@@ -1095,9 +1095,10 @@ ws.onmessage = function(event) {
     let ws;
     let userRole = "viewer";
     let isStreaming = false;
-    let lastFrameTime = 0;
+    //let lastFrameTime = 0;
+    let streamIntervalId = null;
     const frameInterval = 1000 / FPS;
-
+    
     function showStream() {
         liveStreamImg.style.display = 'block';
         streamPlaceholder.style.display = 'none';
@@ -1135,19 +1136,24 @@ ws.onmessage = function(event) {
             const videoTrack = stream.getVideoTracks()[0];
             videoTrack.onended = () => {
                 isStreaming = false;
+                // --- AÑADIR ESTA LÍNEA ---
+                if (streamIntervalId) clearInterval(streamIntervalId); 
                 fetch(STREAM_ENDED_URL, { method: 'POST', headers: { 'X-Secret-Key': SECRET_KEY } });
             };
 
             previewVideo.onloadedmetadata = () => {
                 isStreaming = true;
-                requestAnimationFrame(gameLoop);
+                //requestAnimationFrame(gameLoop);
+                // --- NUEVO CÓDIGO ---
+                if (streamIntervalId) clearInterval(streamIntervalId); // Limpiamos cualquier intervalo anterior
+                streamIntervalId = setInterval(captureAndStreamFrame, frameInterval); // 1000ms / 10 FPS = 100ms
             };
         } catch (err) {
             console.error("Error al iniciar captura:", err.name);
             fetch(STREAM_ENDED_URL, { method: 'POST', headers: { 'X-Secret-Key': SECRET_KEY } });
         }
     }
-
+	/*
     function gameLoop(currentTime) {
         if (!isStreaming) return;
         requestAnimationFrame(gameLoop);
@@ -1156,6 +1162,7 @@ ws.onmessage = function(event) {
         lastFrameTime = currentTime;
         captureAndStreamFrame();
     }
+	*/
 	
 	/*
     async function captureAndStreamFrame() {
@@ -1252,6 +1259,9 @@ ws.onmessage = function(event) {
                         break;
                     case 'stream_ended':
                         isStreaming = false;
+                        // --- AÑADIR ESTA LÍNEA ---
+                        if (streamIntervalId) clearInterval(streamIntervalId);
+                        
                         if (userRole === 'streamer') {
                             showPlaceholder("La transmisión ha finalizado. Puedes iniciar una nueva.");
                         } else {
