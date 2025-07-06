@@ -124,11 +124,43 @@ async def upload_image(file: UploadFile = File(...), x_secret_key: Optional[str]
     return {"message": "Imagen recibida"}
 
 # Endpoint para ver la imagen en vivo (Tu código está perfecto aquí)
+"""
 @app.get("/live.jpg")
 async def get_live_image():
     if latest_image_bytes is None:
         raise HTTPException(status_code=404, detail="No hay imagen disponible")
     return Response(content=latest_image_bytes, media_type="image/jpeg")
+"""
+# VERSIÓN FINAL Y ROBUSTA DEL ENDPOINT DE IMAGEN
+@app.get("/live_data")
+async def get_live_image_data():
+    """
+    Sirve los bytes de la última imagen capturada.
+    - Usa una ruta no estándar (/live_data) para evitar bloqueadores de anuncios.
+    - Establece el Content-Type a image/jpeg para que el navegador la renderice como imagen.
+    - Añade cabeceras para deshabilitar completamente la caché del navegador para este recurso.
+    """
+    if latest_image_bytes is None:
+        # Si aún no se ha subido ninguna imagen, devolvemos un 404.
+        # Podríamos también devolver una imagen placeholder de "Stream Offline".
+        raise HTTPException(status_code=404, detail="Stream no iniciado o imagen no disponible.")
+    
+    # Definimos las cabeceras para controlar la caché
+    cache_headers = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate', # Para navegadores modernos
+        'Pragma': 'no-cache',                                   # Cabecera HTTP/1.0 para compatibilidad
+        'Expires': '0'                                          # Para proxies y navegadores antiguos
+    }
+    
+    # Devolvemos la respuesta con:
+    # 1. Los bytes de la imagen.
+    # 2. El tipo de medio correcto (importantísimo).
+    # 3. Las cabeceras de no-cache.
+    return Response(
+        content=latest_image_bytes, 
+        media_type="image/jpeg", 
+        headers=cache_headers
+    )
 
 # Otros endpoints (Sin cambios)
 @app.post("/send/")

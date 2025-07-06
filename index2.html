@@ -116,7 +116,8 @@
 
 		// --- Lógica de Refresco de Imagen ---
 		// Usamos el truco del timestamp para evitar la caché del navegador
-		liveStreamImg.src = '/live.jpg?t=' + new Date().getTime();
+		//liveStreamImg.src = '/live.jpg?t=' + new Date().getTime();
+		liveStreamImg.src = '/live_data?t=' + new Date().getTime();
 	}
 
 	async function captureAndStreamFrame() {
