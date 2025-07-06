@@ -200,3 +200,19 @@ async def websocket_blender(websocket: WebSocket):
     except WebSocketDisconnect:
         print("--> Conexión WebSocket de Blender cerrada.")
         manager.disconnect_blender(websocket)
+
+# --- NUEVO ENDPOINT PARA NOTIFICAR EL FIN DEL STREAM ---
+@app.post("/stream_ended")
+async def notify_stream_ended(x_secret_key: Optional[str] = Header(None)):
+    # Usamos la misma clave secreta como una medida de seguridad simple
+    if x_secret_key != SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Clave secreta inválida")
+    
+    # Preparamos el mensaje para los espectadores
+    payload = {"type": "stream_ended"}
+    
+    # Lo enviamos a todos los usuarios conectados
+    await manager.broadcast_to_users_json(payload)
+    
+    print("Notificación de fin de stream enviada a todos los espectadores.")
+    return {"status": "ok", "message": "Notificación de fin de stream enviada."}

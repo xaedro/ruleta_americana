@@ -478,6 +478,7 @@
 </html>
 -->
 
+<!--
 <!DOCTYPE html>
 <html>
 <head>
@@ -674,6 +675,266 @@
                 if (data.type === 'live_frame') {
                     showStream();
                     liveStreamImg.src = 'data:image/jpeg;base64,' + data.data;
+                } else if (data.type === 'juego_numero') {
+                    juegoNumeroElem.textContent = 'Juego Número: ' + data.payload;
+                } else if (data.type === 'fecha_hora') {
+                    fechaHoraElem.textContent = 'Fecha y Hora: ' + data.payload;
+                } else {
+                    console.log("Mensaje JSON desconocido recibido:", data);
+                }
+
+            } catch (e) {
+                const messageText = event.data;
+                if (messageText.startsWith("Usuarios conectados:")) {
+                    usuariosElem.textContent = messageText;
+                } else {
+                    const li = document.createElement('li');
+                    li.textContent = messageText;
+                    messagesElem.appendChild(li);
+                }
+            }
+        };
+
+        ws.onclose = () => {
+            console.log(`Conexión WebSocket cerrada. Reconectando en ${reconnectInterval / 1000}s...`);
+            setTimeout(connectWebSocket, reconnectInterval);
+        };
+
+        ws.onerror = (error) => {
+            console.error("Error en WebSocket:", error);
+            ws.close();
+        };
+    }
+    
+    function sendMessage(event) {
+        event.preventDefault();
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            alert("No estás conectado. Espera a que se restablezca la conexión.");
+            return;
+        }
+        const nombreInput = document.getElementById('nombre');
+        const apuestaInput = document.getElementById('apuesta');
+        ws.send(JSON.stringify({
+            nombre: nombreInput.value.trim(),
+            apuesta: apuestaInput.value.trim()
+        }));
+        apuestaInput.value = '';
+    }
+
+    connectWebSocket();
+</script>
+</body>
+</html>
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ruleta Americana (Stream por WebSocket)</title>
+    <style>
+        body { font-family: sans-serif; }
+        ul#messages { list-style-type: none; padding-left: 0; }
+        .video-container {
+            position: relative;
+            background-color: #000;
+            width: 800px;
+            height: 600px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #live-stream {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .video-placeholder {
+            position: absolute;
+            color: #888;
+            font-size: 1.5em;
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        #capture-controls button { display: inline-block; padding: 10px 20px; font-size: 16px; font-weight: bold; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; margin-right: 10px; }
+        #startButton { background-color: #28a745; }
+        #startButton:hover { background-color: #218838; }
+        #startButton:disabled { background-color: #6c757d; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h1>Ruleta Americana (Stream por WebSocket)</h1>
+
+    <div class="video-container">
+        <img id="live-stream" src="" alt="Stream de video">
+        <div id="streamPlaceholder" class="video-placeholder">Presiona el botón para iniciar la transmisión.</div>
+    </div>
+
+    <div id="capture-controls">
+        <button id="startButton">INICIAR TRANSMISIÓN</button>
+    </div>
+
+    <canvas id="canvas" style="display:none;"></canvas>
+    <video id="preview" autoplay muted style="display:none;"></video>
+
+    <br>
+    <p id="fecha_hora">Fecha y Hora: Esperando...</p>
+    <p id="juego_numero">Juego Número: Esperando...</p>
+    <p id="usuarios">Usuarios conectados: 0</p>
+
+    <h1>Realiza tu apuesta</h1>
+    <form onsubmit="sendMessage(event)">
+        <input type="text" id="nombre" placeholder="Tu nombre" autocomplete="off" required/>
+        <input type="number" id="apuesta" placeholder="Número de apuesta" autocomplete="off" min="0" max="36" required/>
+        <button>Enviar</button>
+    </form>
+
+    <ul id="messages"></ul>
+
+<script>
+    // ======================================================================
+    // --- VARIABLES Y CONFIGURACIÓN ---
+    // ======================================================================
+    const startButton = document.getElementById('startButton');
+    const previewVideo = document.getElementById('preview');
+    const canvas = document.getElementById('canvas');
+    const liveStreamImg = document.getElementById('live-stream');
+    const streamPlaceholder = document.getElementById('streamPlaceholder');
+
+    const UPLOAD_URL = '/upload';
+    const STREAM_ENDED_URL = '/stream_ended';
+    const SECRET_KEY = 'tu_clave_secreta_super_dificil';
+    const FPS = 10;
+
+	const cropX = 815;
+	const cropY = 107;
+	const cropWidth = 702;
+	const cropHeight = 391;
+
+    let isStreaming = false;
+    let lastFrameTime = 0;
+    const frameInterval = 1000 / FPS;
+
+    // ======================================================================
+    // --- FUNCIONES DE UI Y LÓGICA DE STREAM ---
+    // ======================================================================
+
+    function showStream() {
+        liveStreamImg.style.display = 'block';
+        streamPlaceholder.style.display = 'none';
+    }
+
+    function showPlaceholder(message) {
+        liveStreamImg.style.display = 'none';
+        liveStreamImg.src = '';
+        streamPlaceholder.style.display = 'block';
+        streamPlaceholder.textContent = message;
+    }
+    
+    showPlaceholder("Presiona 'INICIAR TRANSMISIÓN' para compartir tu pantalla.");
+
+    startButton.onclick = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            previewVideo.srcObject = stream;
+            
+            const videoTrack = stream.getVideoTracks()[0];
+            videoTrack.onended = () => {
+                console.log("El usuario ha detenido la compartición de pantalla.");
+                isStreaming = false;
+                startButton.disabled = false;
+                startButton.textContent = "INICIAR TRANSMISIÓN";
+                previewVideo.srcObject = null;
+                showPlaceholder("La transmisión ha finalizado. Presiona el botón para iniciar de nuevo.");
+
+                // Notificamos al servidor que el stream terminó para que avise a los demás
+                fetch(STREAM_ENDED_URL, {
+                    method: 'POST',
+                    headers: { 'X-Secret-Key': SECRET_KEY }
+                }).then(res => res.json())
+                  .then(data => console.log(data.message))
+                  .catch(err => console.error("Error al notificar fin de stream:", err));
+            };
+
+            previewVideo.onloadedmetadata = () => {
+                startButton.disabled = true;
+                startButton.textContent = "TRANSMITIENDO EN VIVO...";
+                isStreaming = true;
+                requestAnimationFrame(gameLoop);
+            };
+        } catch (err) { 
+            console.error("Error al iniciar la captura:", err.name); 
+            startButton.disabled = false;
+            startButton.textContent = "INICIAR TRANSMISIÓN";
+            isStreaming = false;
+        }
+    };
+
+    function gameLoop(currentTime) {
+        if (!isStreaming) return;
+        requestAnimationFrame(gameLoop);
+        const deltaTime = currentTime - lastFrameTime;
+        if (deltaTime < frameInterval) { return; }
+        lastFrameTime = currentTime;
+        captureAndStreamFrame();
+    }
+
+    async function captureAndStreamFrame() {
+        try {
+            const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
+            canvas.width = imageBitmap.width;
+            canvas.height = imageBitmap.height;
+            const context = canvas.getContext('2d');
+            context.drawImage(imageBitmap, 0, 0);
+            imageBitmap.close();
+            canvas.toBlob((blob) => {
+                if (!blob) return;
+                const formData = new FormData();
+                formData.append('file', blob, 'live.jpg');
+                fetch(UPLOAD_URL, {
+                    method: 'POST',
+                    headers: { 'X-Secret-Key': SECRET_KEY },
+                    body: formData
+                }).catch(err => console.error("Error de red al subir frame:", err));
+            }, 'image/jpeg', 0.40);
+        } catch (error) {
+            console.warn("No se pudo procesar el fotograma:", error.name);
+        }
+    }
+
+    // ======================================================================
+    // --- LÓGICA DEL WEBSOCKET ---
+    // ======================================================================
+
+    const fechaHoraElem = document.getElementById('fecha_hora');
+    const juegoNumeroElem = document.getElementById('juego_numero');
+    const usuariosElem = document.getElementById('usuarios');
+    const messagesElem = document.getElementById('messages');
+    
+	const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.host;
+    const wsUrl = `${wsProtocol}//${wsHost}/ws/users`;
+    let ws;
+    const reconnectInterval = 3000;
+
+    function connectWebSocket() {
+        console.log(`Intentando conectar al WebSocket en ${wsUrl}...`);
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => console.log("Conexión WebSocket establecida.");
+
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'live_frame') {
+                    showStream();
+                    liveStreamImg.src = 'data:image/jpeg;base64,' + data.data;
+                } else if (data.type === 'stream_ended') {
+                    console.log("El stream ha finalizado. Mostrando placeholder.");
+                    showPlaceholder("La transmisión ha finalizado.");
                 } else if (data.type === 'juego_numero') {
                     juegoNumeroElem.textContent = 'Juego Número: ' + data.payload;
                 } else if (data.type === 'fecha_hora') {
