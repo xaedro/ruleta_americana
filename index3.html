@@ -949,7 +949,7 @@ ws.onmessage = function(event) {
 			} else if (data.type === 'stream_ended') {
 				console.log("El stream ha finalizado. Mostrando placeholder.");
 				// Le pasamos un mensaje específico para los espectadores
-				showPlaceholder("La transmisión ha finalizado.");
+				showPlaceholder("La transmisión ha finalizado.\nPresiona el botón para iniciar de nuevo.");
 			
 			} else if (data.type === 'juego_numero') {
 				juegoNumeroElem.textContent = 'Juego Número: ' + data.payload;
