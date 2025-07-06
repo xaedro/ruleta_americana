@@ -1188,7 +1188,7 @@ ws.onmessage = function(event) {
         }
     }
 	*/
-	
+	/*
 	async function captureAndStreamFrame() {
 		if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
@@ -1216,7 +1216,44 @@ ws.onmessage = function(event) {
 			}
 		}
 	}
+	*/
+	
+	async function captureAndStreamFrame() {
+		if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
+		// Definimos un tamaño de salida más pequeño. 
+		// Mantiene la proporción de 702x391 (aprox 16:9)
+		const outputWidth = 480; // Antes era 702
+		const outputHeight = 267; // Antes era 391
+
+		try {
+			// Capturamos el área original
+			const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
+			
+			// Usamos el canvas para reescalar la imagen
+			canvas.width = outputWidth;
+			canvas.height = outputHeight;
+			const context = canvas.getContext('2d');
+			
+			// Dibujamos la imagen capturada en el canvas, pero reescalada a las nuevas dimensiones
+			context.drawImage(imageBitmap, 0, 0, outputWidth, outputHeight);
+			imageBitmap.close();
+			
+			// Comprimimos la imagen reescalada (y más pequeña)
+			// Podemos probar a subir un poco la calidad ya que el tamaño en píxeles es menor
+			const base64Image = canvas.toDataURL('image/jpeg', 0.50).split(',')[1]; // Subimos calidad a 0.50
+
+			ws.send(JSON.stringify({
+				type: "video_frame",
+				data: base64Image
+			}));
+
+		} catch (error) {
+			if (error.name !== 'InvalidStateError') {
+				 console.warn("No se pudo procesar el fotograma:", error.name);
+			}
+		}
+	}
     function connectWebSocket() {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsHost = window.location.host;

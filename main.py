@@ -317,7 +317,7 @@ class ConnectionManager:
     async def broadcast_to_users_json(self, data: dict):
         await self.broadcast_to_users_text(json.dumps(data))
     
-    # ¡NUEVA FUNCIÓN!
+    """
     async def broadcast_to_others_json(self, data: dict, sender: WebSocket):
         message = json.dumps(data)
         # Iteramos sobre una copia de la lista por si hay desconexiones
@@ -327,7 +327,7 @@ class ConnectionManager:
                     await connection.send_text(message)
                 except:
                     self.disconnect_user(connection)
-    
+    """
     async def connect_blender(self, websocket: WebSocket):
         await websocket.accept()
         if not self.blender_connections:
@@ -456,7 +456,8 @@ async def websocket_users(websocket: WebSocket):
                     # Preparamos el payload que recibirán los espectadores
                     payload = {"type": "live_frame", "data": data.get("data")}
                     # Usamos la nueva función para retransmitir a todos los demás
-                    await manager.broadcast_to_others_json(payload, sender=websocket)
+                    #await manager.broadcast_to_others_json(payload, sender=websocket)
+                    await manager.broadcast_to_users_json(payload)
             # --- FIN DE LA MODIFICACIÓN ---
             
             elif "nombre" in data and "apuesta" in data:
