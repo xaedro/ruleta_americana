@@ -1292,10 +1292,23 @@ ws.onmessage = function(event) {
         body { font-family: sans-serif; padding: 20px; }
         ul#messages { list-style-type: none; padding-left: 0; }
         .video-container {
-            position: relative; background-color: #000; width: 480px;
-            height: 267px; margin-bottom: 10px; border: 1px solid #ccc;
-            display: flex; justify-content: center; align-items: center;
-        }
+			position: relative;
+			background-color: #000;
+			
+			/* Establece un ancho. Puede ser fijo o porcentual. */
+			width: 100%; 
+			max-width: 800px; /* Un límite para que no se haga gigante en pantallas grandes */
+			
+			/* Quitamos la altura fija. El JS la controlará. */
+			/* height: 446px; */ 
+
+			margin: 0 auto 10px auto; /* Centramos el contenedor */
+			border: 1px solid #ccc;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			/* La relación de aspecto la pondremos con JS */
+		}
         #live-stream { width: 100%; height: 100%; object-fit: contain; }
         .video-placeholder {
             position: absolute; color: #888; font-size: 1.5em;
@@ -1359,6 +1372,7 @@ ws.onmessage = function(event) {
 
 <script>
     // --- Referencias a elementos del DOM ---
+	const videoContainer = document.querySelector('.video-container');
     const loginContainer = document.getElementById('login-container');
     const mainContainer = document.getElementById('main-container');
     const loginForm = document.getElementById('login-form');
@@ -1380,8 +1394,19 @@ ws.onmessage = function(event) {
     
     // --- Constantes y variables globales ---
     const SECRET_KEY = 'tu_clave_secreta_super_dificil';
-    const FPS = 5;
+    const FPS = 10;
     const cropX = 815, cropY = 107, cropWidth = 702, cropHeight = 391;
+
+	// Dimensiones de la imagen final que se envía y se muestra
+	const outputWidth = 480;
+	const outputHeight = 267;
+
+	// --- ¡NUEVA LÓGICA DINÁMICA! ---
+	// Calculamos la relación de aspecto
+	const aspectRatio = outputWidth / outputHeight;
+	// La aplicamos al contenedor usando la propiedad CSS 'aspect-ratio'
+	videoContainer.style.aspectRatio = aspectRatio;
+	// --- FIN DE LA NUEVA LÓGICA ---
 
     let ws;
     let userRole = "viewer";
@@ -1390,6 +1415,7 @@ ws.onmessage = function(event) {
     // CAMBIO 4: Creamos una variable para guardar el nombre del usuario logueado
     let currentUsername = '';
     
+	
     function showStream() {
         liveStreamImg.style.display = 'block';
         streamPlaceholder.style.display = 'none';
