@@ -1386,6 +1386,7 @@ ws.onmessage = function(event) {
     let ws;
     let userRole = "viewer";
     let isStreaming = false;
+    let isStreaming = false;
     const frameInterval = 1000 / FPS;
     // CAMBIO 4: Creamos una variable para guardar el nombre del usuario logueado
     let currentUsername = '';
@@ -1416,32 +1417,49 @@ ws.onmessage = function(event) {
     };
 
     startButton.onclick = () => {
-        if (userRole === 'streamer') {
+        if (userRole === 'streamer' && !isStreaming) {
             ws.send(JSON.stringify({ type: 'start_stream' }));
         }
     };
 
     async function startScreenCapture() {
-        // ... (sin cambios en esta función)
-        try {
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-            previewVideo.srcObject = stream;
-            
-            const videoTrack = stream.getVideoTracks()[0];
-            videoTrack.onended = () => {
-                isStreaming = false;
-                fetch('/stream_ended', { method: 'POST', headers: { 'X-Secret-Key': SECRET_KEY } });
-            };
+		if (isStreaming) return; // Protección para no ejecutar dos veces
 
-            previewVideo.onloadedmetadata = () => {
-                isStreaming = true;
-                streamLoop(); 
-            };
-        } catch (err) {
-            console.error("Error al iniciar captura:", err.name);
-            fetch('/stream_ended', { method: 'POST', headers: { 'X-Secret-Key': SECRET_KEY } });
-        }
-    }
+		try {
+			const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+			
+			// Ponemos el estado a "transmitiendo" y actualizamos la UI
+			isStreaming = true;
+			startButton.disabled = true;
+			startButton.textContent = "TRANSMITIENDO...";
+
+			// Asignamos el stream al video de vista previa
+			previewVideo.srcObject = stream;
+			
+			// Escuchamos el evento 'onended' UNA SOLA VEZ
+			// Este se dispara si el usuario hace clic en "Dejar de compartir" del navegador.
+			const videoTrack = stream.getVideoTracks()[0];
+			videoTrack.onended = () => {
+				console.log("Captura de pantalla detenida por el usuario.");
+				// La única acción que tomamos es notificar al servidor vía WebSocket.
+				// El servidor se encargará de avisar a todos, incluido a nosotros mismos.
+				if (ws && ws.readyState === WebSocket.OPEN) {
+					ws.send(JSON.stringify({ type: 'stream_ended' }));
+				}
+			};
+
+			// Una vez que los metadatos del video están listos, iniciamos el bucle de envío de fotogramas.
+			previewVideo.onloadedmetadata = () => {
+				streamLoop(); 
+			};
+
+		} catch (err) {
+			// Si el usuario cancela el diálogo de "compartir pantalla", se lanza un error.
+			console.error("Error al iniciar captura:", err.name);
+			// No necesitamos hacer nada más aquí, ya que el estado 'isStreaming' nunca se puso a true.
+			// El botón sigue habilitado.
+		}
+	}
 	
 	function streamLoop() {
 		// ... (sin cambios en esta función)
@@ -1517,9 +1535,21 @@ ws.onmessage = function(event) {
                         isStreaming = false;
                         if (userRole === 'streamer') {
                             showPlaceholder("La transmisión ha finalizado. Puedes iniciar una nueva.");
+							// Reseteamos el botón para que se pueda volver a usar
+							startButton.disabled = false;
+							startButton.textContent = "INICIAR TRANSMISIÓN";
+							// Limpiamos el objeto de stream para liberar recursos
+							if (previewVideo.srcObject) {
+								previewVideo.srcObject.getTracks().forEach(track => track.stop());
+								previewVideo.srcObject = null;
+							}
                         } else {
                             showPlaceholder("La transmisión ha finalizado. Esperando al streamer.");
                         }
+						
+						// Limpiamos la imagen para todos
+						liveStreamImg.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+				
                         break;
                     case 'live_frame':
                         liveStreamImg.src = 'data:image/jpeg;base64,' + data.data;
