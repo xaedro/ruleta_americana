@@ -418,11 +418,22 @@ async def websocket_users(websocket: WebSocket):
                     await websocket.send_text(json.dumps({"type": "stream_status", "active": streamer_is_active}))
 
             elif msg_type == "start_stream":
-                
                 if websocket == streamer_ws and not streamer_is_active:
                     streamer_is_active = True
                     await manager.broadcast_to_users_json({"type": "stream_started"})
                     print("El streamer ha iniciado la transmisión.")
+			# --- INICIO DE LA MODIFICACIÓN ---
+            elif msg_type == "stream_ended":
+                # Verificamos que quien envía el mensaje es realmente el streamer
+                if websocket == streamer_ws:
+                    print("El streamer ha finalizado la transmisión manualmente.")
+                    streamer_is_active = False
+                    # No reseteamos streamer_ws a None todavía, para que pueda iniciar otro stream
+                    # si quiere sin tener que volver a loguearse.
+                    
+                    # Notificamos a TODOS los usuarios conectados que el stream terminó.
+                    await manager.broadcast_to_users_json({"type": "stream_ended"})
+            # --- FIN DE LA MODIFICACIÓN ---
             elif msg_type == "video_frame":
                 # Solo el streamer puede enviar fotogramas de video
                 if websocket == streamer_ws and streamer_is_active:
