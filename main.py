@@ -317,17 +317,6 @@ class ConnectionManager:
     async def broadcast_to_users_json(self, data: dict):
         await self.broadcast_to_users_text(json.dumps(data))
     
-    """
-    async def broadcast_to_others_json(self, data: dict, sender: WebSocket):
-        message = json.dumps(data)
-        # Iteramos sobre una copia de la lista por si hay desconexiones
-        for connection in list(self.user_connections):
-            if connection != sender: # La condición clave: no enviar al remitente
-                try:
-                    await connection.send_text(message)
-                except:
-                    self.disconnect_user(connection)
-    """
     async def connect_blender(self, websocket: WebSocket):
         await websocket.accept()
         if not self.blender_connections:
@@ -359,20 +348,7 @@ async def read_root():
         return FileResponse(html_file_path)
     else:
         raise HTTPException(status_code=404, detail="Archivo 'index3.html' no encontrado.")
-"""
-@app.post("/upload")
-async def upload_image(file: UploadFile = File(...), x_secret_key: Optional[str] = Header(None)):
-    if not streamer_is_active:
-        raise HTTPException(status_code=403, detail="No hay ningún stream activo actualmente.")
-    if x_secret_key != SECRET_KEY:
-        raise HTTPException(status_code=403, detail="Clave secreta inválida")
-    
-    image_bytes = await file.read()
-    base64_image = base64.b64encode(image_bytes).decode("utf-8")
-    payload = {"type": "live_frame", "data": base64_image}
-    await manager.broadcast_to_users_json(payload)
-    return {"status": "ok"}
-"""
+
 @app.post("/stream_ended")
 async def notify_stream_ended(x_secret_key: Optional[str] = Header(None)):
     global streamer_ws, streamer_is_active
@@ -431,7 +407,6 @@ async def websocket_users(websocket: WebSocket):
                     if username == STREAMER_USERNAME:
                         print(f"Usuario '{username}' intentó iniciar sesión, pero el rol ya está ocupado.")
                     await websocket.send_text(json.dumps({"type": "login_success", "role": role}))
-                    # --- INICIO DE LA CORRECCIÓN ---
                     # Si el stream ya está activo cuando el usuario se loguea,
                     # le enviamos el evento para que inicie la visualización.
                     if streamer_is_active:
@@ -439,7 +414,6 @@ async def websocket_users(websocket: WebSocket):
                     else:
                         # Si no, le informamos del estado actual (inactivo).
                         await websocket.send_text(json.dumps({"type": "stream_status", "active": False}))
-                    # --- FIN DE LA CORRECCIÓN ---
                     
                     await websocket.send_text(json.dumps({"type": "stream_status", "active": streamer_is_active}))
 
@@ -449,7 +423,6 @@ async def websocket_users(websocket: WebSocket):
                     streamer_is_active = True
                     await manager.broadcast_to_users_json({"type": "stream_started"})
                     print("El streamer ha iniciado la transmisión.")
-            # --- INICIO DE LA MODIFICACIÓN ---
             elif msg_type == "video_frame":
                 # Solo el streamer puede enviar fotogramas de video
                 if websocket == streamer_ws and streamer_is_active:
@@ -458,7 +431,6 @@ async def websocket_users(websocket: WebSocket):
                     # Usamos la nueva función para retransmitir a todos los demás
                     #await manager.broadcast_to_others_json(payload, sender=websocket)
                     await manager.broadcast_to_users_json(payload)
-            # --- FIN DE LA MODIFICACIÓN ---
             
             elif "nombre" in data and "apuesta" in data:
                 manager.apuestas_usuarios[websocket] = data

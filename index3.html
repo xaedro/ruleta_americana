@@ -1004,6 +1004,7 @@ ws.onmessage = function(event) {
 </html>
 -->
 
+<!-- index3.html 
 <!DOCTYPE html>
 <html>
 <head>
@@ -1095,8 +1096,6 @@ ws.onmessage = function(event) {
     let ws;
     let userRole = "viewer";
     let isStreaming = false;
-    //let lastFrameTime = 0;
-    //let streamIntervalId = null;
     const frameInterval = 1000 / FPS;
     
     function showStream() {
@@ -1136,87 +1135,18 @@ ws.onmessage = function(event) {
             const videoTrack = stream.getVideoTracks()[0];
             videoTrack.onended = () => {
                 isStreaming = false;
-                //if (streamIntervalId) clearInterval(streamIntervalId); 
                 fetch(STREAM_ENDED_URL, { method: 'POST', headers: { 'X-Secret-Key': SECRET_KEY } });
             };
 
             previewVideo.onloadedmetadata = () => {
                 isStreaming = true;
-                //requestAnimationFrame(gameLoop);
-                // --- NUEVO CÓDIGO ---
-                //if (streamIntervalId) clearInterval(streamIntervalId); // Limpiamos cualquier intervalo anterior
-                //streamIntervalId = setInterval(captureAndStreamFrame, frameInterval); // 1000ms / 10 FPS = 100ms
-				streamLoop(); 
+                streamLoop(); 
             };
         } catch (err) {
             console.error("Error al iniciar captura:", err.name);
             fetch(STREAM_ENDED_URL, { method: 'POST', headers: { 'X-Secret-Key': SECRET_KEY } });
         }
     }
-	/*
-    function gameLoop(currentTime) {
-        if (!isStreaming) return;
-        requestAnimationFrame(gameLoop);
-        const deltaTime = currentTime - lastFrameTime;
-        if (deltaTime < frameInterval) { return; }
-        lastFrameTime = currentTime;
-        captureAndStreamFrame();
-    }
-	*/
-	
-	/*
-    async function captureAndStreamFrame() {
-        try {
-            const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
-            canvas.width = imageBitmap.width;
-            canvas.height = imageBitmap.height;
-            const context = canvas.getContext('2d');
-            context.drawImage(imageBitmap, 0, 0);
-            imageBitmap.close();
-            canvas.toBlob((blob) => {
-                if (!blob) return;
-                const formData = new FormData();
-                formData.append('file', blob, 'live.jpg');
-                fetch(UPLOAD_URL, {
-                    method: 'POST',
-                    headers: { 'X-Secret-Key': SECRET_KEY },
-                    body: formData
-                }).catch(err => console.error("Error de red al subir frame:", err));
-            }, 'image/jpeg', 0.40);
-        } catch (error) {
-            console.warn("No se pudo procesar el fotograma:", error.name);
-        }
-    }
-	*/
-	/*
-	async function captureAndStreamFrame() {
-		if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-		try {
-			const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
-			canvas.width = imageBitmap.width;
-			canvas.height = imageBitmap.height;
-			const context = canvas.getContext('2d');
-			context.drawImage(imageBitmap, 0, 0);
-			imageBitmap.close();
-			
-			// Obtenemos la imagen como Base64 directamente del canvas
-			const base64Image = canvas.toDataURL('image/jpeg', 0.40).split(',')[1];
-
-			// Enviamos el frame a través del WebSocket
-			ws.send(JSON.stringify({
-				type: "video_frame",
-				data: base64Image
-			}));
-
-		} catch (error) {
-			// Si el video está cerrado, createImageBitmap falla. Lo ignoramos.
-			if (error.name !== 'InvalidStateError') {
-				 console.warn("No se pudo procesar el fotograma:", error.name);
-			}
-		}
-	}
-	*/
 	
 	function streamLoop() {
 		// Si la variable isStreaming es false, el bucle se detiene solo.
@@ -1233,44 +1163,6 @@ ws.onmessage = function(event) {
 		});
 	}
 	
-	/*
-	async function captureAndStreamFrame() {
-		if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-		// Definimos un tamaño de salida más pequeño. 
-		// Mantiene la proporción de 702x391 (aprox 16:9)
-		const outputWidth = 702; //480; // Antes era 702
-		const outputHeight = 391; //267; // Antes era 391
-
-		try {
-			// Capturamos el área original
-			const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
-			
-			// Usamos el canvas para reescalar la imagen
-			canvas.width = outputWidth;
-			canvas.height = outputHeight;
-			const context = canvas.getContext('2d');
-			
-			// Dibujamos la imagen capturada en el canvas, pero reescalada a las nuevas dimensiones
-			context.drawImage(imageBitmap, 0, 0, outputWidth, outputHeight);
-			imageBitmap.close();
-			
-			// Comprimimos la imagen reescalada (y más pequeña)
-			// Podemos probar a subir un poco la calidad ya que el tamaño en píxeles es menor
-			const base64Image = canvas.toDataURL('image/jpeg', 0.25).split(',')[1]; // Subimos calidad a 0.50
-
-			ws.send(JSON.stringify({
-				type: "video_frame",
-				data: base64Image
-			}));
-
-		} catch (error) {
-			if (error.name !== 'InvalidStateError') {
-				 console.warn("No se pudo procesar el fotograma:", error.name);
-			}
-		}
-	}
-	*/
 	async function captureAndStreamFrame() {
 		// Esta función ahora es un 'worker' que solo hace una cosa:
 		// capturar y enviar UN frame.
@@ -1333,11 +1225,6 @@ ws.onmessage = function(event) {
                             showPlaceholder("Esperando que el streamer inicie la transmisión..."); 
                         }
                         break;
-                        /*
-                        if(data.active) { showPlaceholder("Transmisión en curso..."); }
-                        else { showPlaceholder("Esperando que el streamer inicie la transmisión..."); }
-                        break;
-                        */
                     case 'stream_started':
                         showStream();
                         if (userRole === 'streamer') { startScreenCapture(); }
@@ -1386,6 +1273,303 @@ ws.onmessage = function(event) {
         const apuestaInput = document.getElementById('apuesta');
         ws.send(JSON.stringify({
             nombre: nombreInput.value.trim(),
+            apuesta: apuestaInput.value.trim()
+        }));
+        apuestaInput.value = '';
+    }
+
+    connectWebSocket();
+</script>
+</body>
+</html>
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ruleta Americana - Login</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        ul#messages { list-style-type: none; padding-left: 0; }
+        .video-container {
+            position: relative; background-color: #000; width: 800px;
+            height: 600px; margin-bottom: 10px; border: 1px solid #ccc;
+            display: flex; justify-content: center; align-items: center;
+        }
+        #live-stream { width: 100%; height: 100%; object-fit: contain; }
+        .video-placeholder {
+            position: absolute; color: #888; font-size: 1.5em;
+            text-align: center; padding: 20px; display: none;
+        }
+        #capture-controls button {
+            display: inline-block; padding: 10px 20px; font-size: 16px;
+            font-weight: bold; color: white; border: none;
+            border-radius: 5px; cursor: pointer; margin-top: 10px; margin-right: 10px;
+        }
+        #startButton { background-color: #28a745; }
+        #startButton:hover { background-color: #218838; }
+        #startButton:disabled { background-color: #6c757d; cursor: not-allowed; }
+        #main-container, #capture-controls { display: none; }
+        #login-container { text-align: center; margin-top: 50px; }
+        /* Estilo para el botón de apuestas deshabilitado */
+        #btnEnviarApuesta:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    
+    <div id="login-container">
+        <h1>Bienvenido a la Ruleta Americana</h1>
+        <p>Por favor, ingresa tu nombre para continuar.</p>
+        <form id="login-form">
+            <input type="text" id="name-input" placeholder="Tu nombre" required>
+            <button type="submit">Ingresar</button>
+        </form>
+        <p id="login-status" style="color: red;"></p>
+    </div>
+
+    <div id="main-container">
+        <h1>Ruleta Americana (Stream en Vivo)</h1>
+        <div class="video-container">
+            <img id="live-stream" src="" alt="Stream de video">
+            <div id="streamPlaceholder" class="video-placeholder"></div>
+        </div>
+        <div id="capture-controls">
+            <button id="startButton">INICIAR TRANSMISIÓN</button>
+        </div>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <video id="preview" autoplay muted style="display:none;"></video>
+        <br>
+        <p id="fecha_hora">Fecha y Hora: Esperando...</p>
+        <p id="juego_numero">Juego Número: Esperando...</p>
+        <p id="usuarios">Usuarios conectados: 0</p>
+        <h1>Realiza tu apuesta</h1>
+        <form onsubmit="sendMessage(event)">
+            <!-- CAMBIO 1: Reemplazamos el input de texto por una etiqueta para el nombre -->
+            <label>Jugador: <strong id="nombre-logueado"></strong></label>
+            <br><br>
+            <input type="number" id="apuesta" placeholder="Número de apuesta" autocomplete="off" min="0" max="36" required/>
+            <!-- CAMBIO 2: Añadimos un ID al botón y lo deshabilitamos por defecto -->
+            <button id="btnEnviarApuesta" disabled>Enviar</button>
+        </form>
+        <ul id="messages"></ul>
+    </div>
+
+<script>
+    // --- Referencias a elementos del DOM ---
+    const loginContainer = document.getElementById('login-container');
+    const mainContainer = document.getElementById('main-container');
+    const loginForm = document.getElementById('login-form');
+    const nameInput = document.getElementById('name-input');
+    const loginStatus = document.getElementById('login-status');
+    const startButton = document.getElementById('startButton');
+    const captureControls = document.getElementById('capture-controls');
+    const previewVideo = document.getElementById('preview');
+    const canvas = document.getElementById('canvas');
+    const liveStreamImg = document.getElementById('live-stream');
+    const streamPlaceholder = document.getElementById('streamPlaceholder');
+    const fechaHoraElem = document.getElementById('fecha_hora');
+    const juegoNumeroElem = document.getElementById('juego_numero');
+    const usuariosElem = document.getElementById('usuarios');
+    const messagesElem = document.getElementById('messages');
+    // CAMBIO 3: Obtenemos referencia al nuevo elemento del nombre y al botón de apuesta
+    const nombreLogueadoElem = document.getElementById('nombre-logueado');
+    const btnEnviarApuesta = document.getElementById('btnEnviarApuesta');
+    
+    // --- Constantes y variables globales ---
+    const SECRET_KEY = 'tu_clave_secreta_super_dificil';
+    const FPS = 5;
+    const cropX = 815, cropY = 107, cropWidth = 702, cropHeight = 391;
+
+    let ws;
+    let userRole = "viewer";
+    let isStreaming = false;
+    const frameInterval = 1000 / FPS;
+    // CAMBIO 4: Creamos una variable para guardar el nombre del usuario logueado
+    let currentUsername = '';
+    
+    function showStream() {
+        liveStreamImg.style.display = 'block';
+        streamPlaceholder.style.display = 'none';
+    }
+
+    function showPlaceholder(message) {
+        liveStreamImg.style.display = 'none';
+        liveStreamImg.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+        streamPlaceholder.style.display = 'block';
+        streamPlaceholder.textContent = message;
+    }
+
+    loginForm.onsubmit = (event) => {
+        event.preventDefault();
+        const username = nameInput.value.trim();
+        if (username && ws && ws.readyState === WebSocket.OPEN) {
+            loginStatus.textContent = '';
+            // CAMBIO 5: Guardamos el nombre de usuario antes de enviarlo
+            currentUsername = username;
+            ws.send(JSON.stringify({ type: "login", name: username }));
+        } else {
+            loginStatus.textContent = "Error: No se pudo conectar al servidor. Inténtalo de nuevo.";
+        }
+    };
+
+    startButton.onclick = () => {
+        if (userRole === 'streamer') {
+            ws.send(JSON.stringify({ type: 'start_stream' }));
+        }
+    };
+
+    async function startScreenCapture() {
+        // ... (sin cambios en esta función)
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            previewVideo.srcObject = stream;
+            
+            const videoTrack = stream.getVideoTracks()[0];
+            videoTrack.onended = () => {
+                isStreaming = false;
+                fetch('/stream_ended', { method: 'POST', headers: { 'X-Secret-Key': SECRET_KEY } });
+            };
+
+            previewVideo.onloadedmetadata = () => {
+                isStreaming = true;
+                streamLoop(); 
+            };
+        } catch (err) {
+            console.error("Error al iniciar captura:", err.name);
+            fetch('/stream_ended', { method: 'POST', headers: { 'X-Secret-Key': SECRET_KEY } });
+        }
+    }
+	
+	function streamLoop() {
+		// ... (sin cambios en esta función)
+		if (!isStreaming) return; 
+		captureAndStreamFrame().then(() => {
+			setTimeout(streamLoop, frameInterval);
+		}).catch(err => {
+			console.error("Error en el ciclo de stream:", err);
+			setTimeout(streamLoop, frameInterval);
+		});
+	}
+	
+	async function captureAndStreamFrame() {
+		// ... (sin cambios en esta función)
+		if (!ws || ws.readyState !== WebSocket.OPEN) return;
+		const outputWidth = 480;
+		const outputHeight = 267;
+		try {
+			const imageBitmap = await createImageBitmap(previewVideo, cropX, cropY, cropWidth, cropHeight);
+			canvas.width = outputWidth;
+			canvas.height = outputHeight;
+			const context = canvas.getContext('2d');
+			context.drawImage(imageBitmap, 0, 0, outputWidth, outputHeight);
+			imageBitmap.close();
+			const base64Image = canvas.toDataURL('image/jpeg', 0.40).split(',')[1];
+			ws.send(JSON.stringify({
+				type: "video_frame",
+				data: base64Image
+			}));
+		} catch (error) {
+			if (error.name !== 'InvalidStateError') {
+				 console.warn("No se pudo procesar el fotograma:", error.name);
+			}
+			throw error; 
+		}
+	}
+
+    function connectWebSocket() {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.host;
+        const wsUrl = `${wsProtocol}//${wsHost}/ws/users`;
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => console.log("Conectado al servidor.");
+
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                
+                switch (data.type) {
+                    case 'login_success':
+                        userRole = data.role;
+                        loginContainer.style.display = 'none';
+                        mainContainer.style.display = 'block';
+                        // CAMBIO 6: Mostramos el nombre del usuario en la nueva etiqueta
+                        nombreLogueadoElem.textContent = currentUsername;
+                        
+                        if (userRole === 'streamer') {
+                            captureControls.style.display = 'block';
+                            showPlaceholder("Login exitoso. Presiona 'INICIAR TRANSMISIÓN'.");
+                        }
+                        break;
+                    // ... (resto de los cases sin cambios)
+                    case 'stream_status':
+                        if (data.active) { showStream(); } 
+                        else { showPlaceholder("Esperando que el streamer inicie la transmisión..."); }
+                        break;
+                    case 'stream_started':
+                        showStream();
+                        if (userRole === 'streamer') { startScreenCapture(); }
+                        break;
+                    case 'stream_ended':
+                        isStreaming = false;
+                        if (userRole === 'streamer') {
+                            showPlaceholder("La transmisión ha finalizado. Puedes iniciar una nueva.");
+                        } else {
+                            showPlaceholder("La transmisión ha finalizado. Esperando al streamer.");
+                        }
+                        break;
+                    case 'live_frame':
+                        liveStreamImg.src = 'data:image/jpeg;base64,' + data.data;
+                        break;
+                    case 'juego_numero':
+                        juegoNumeroElem.textContent = 'Juego Número: ' + data.payload;
+                        break;
+                    case 'fecha_hora':
+                        fechaHoraElem.textContent = 'Fecha y Hora: ' + data.payload;
+                        break;
+                    default:
+                        console.log("Mensaje JSON desconocido:", data);
+                }
+            } catch (e) {
+                // El mensaje no es JSON, lo tratamos como texto plano
+                const messageText = event.data;
+                
+                // CAMBIO 7: Lógica para habilitar/deshabilitar el botón de apuesta
+                if (messageText.trim() === "INICIO del juego") {
+                    btnEnviarApuesta.disabled = false;
+                    console.log("Apuestas habilitadas.");
+                } else if (messageText.trim() === "FIN del juego") {
+                    btnEnviarApuesta.disabled = true;
+                    console.log("Apuestas deshabilitadas.");
+                }
+                
+                // Mantenemos la lógica existente para otros mensajes de texto
+                if (messageText.startsWith("Usuarios conectados:")) {
+                    usuariosElem.textContent = messageText;
+                } else {
+                    const li = document.createElement('li');
+                    li.textContent = messageText;
+                    messagesElem.appendChild(li);
+                }
+            }
+        };
+
+        ws.onclose = () => { console.log("Conexión cerrada. Intentando reconectar..."); setTimeout(connectWebSocket, 3000); };
+        ws.onerror = (error) => { console.error("Error en WebSocket:", error); ws.close(); };
+    }
+    
+    function sendMessage(event) {
+        event.preventDefault();
+        if (!ws || ws.readyState !== WebSocket.OPEN) { alert("No estás conectado."); return; }
+        
+        // CAMBIO 8: Ya no leemos el nombre de un input, usamos la variable global
+        const apuestaInput = document.getElementById('apuesta');
+        
+        ws.send(JSON.stringify({
+            nombre: currentUsername, // Usamos la variable guardada
             apuesta: apuestaInput.value.trim()
         }));
         apuestaInput.value = '';
