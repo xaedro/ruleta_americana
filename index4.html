@@ -286,29 +286,48 @@
 		// PASO 2: DEFINIR QUÉ HACER CUANDO LLEGUEN LOS DATOS
 		// Este es el bloque que modificamos para forzar el play.
 		peerConnection.ontrack = (event) => {
-			console.log("Track de video/audio remoto recibido.");
-			if (liveStreamVideo.srcObject !== event.streams[0]) {
-				liveStreamVideo.srcObject = event.streams[0];
+			console.log("-> EVENTO ONTRACK DISPARADO");
+
+			const remoteStream = event.streams[0];
+			if (liveStreamVideo.srcObject !== remoteStream) {
 				console.log("Asignando nuevo stream al elemento de video.");
+				liveStreamVideo.srcObject = remoteStream;
 			}
 
-			// Forzar la reproducción por si el autoplay falla
+			// El navegador requiere una interacción del usuario para reproducir video con sonido.
+			// La mejor práctica es poner el video remoto en 'muted' y 'autoplay'.
+			// El usuario puede desmutearlo si quiere.
+			liveStreamVideo.muted = true;
+			liveStreamVideo.playsInline = true; // Importante para móviles
+
+			console.log("Intentando reproducir el video...");
 			const playPromise = liveStreamVideo.play();
+
 			if (playPromise !== undefined) {
-				playPromise.catch(error => {
+				playPromise.then(() => {
+					// El autoplay funcionó.
+					console.log("¡La reproducción del video se inició con éxito!");
+					showStream();
+				}).catch(error => {
+					// El autoplay fue bloqueado por el navegador.
 					console.error("La reproducción automática fue bloqueada:", error);
-					// Si falla, mostramos un mensaje para que el usuario haga clic
-					showPlaceholder("La transmisión está lista. Haz clic en el video para reproducir.");
-					// Añadimos un listener de clic para iniciar la reproducción manualmente
-					liveStreamVideo.onclick = () => {
-						liveStreamVideo.play();
-						showStream();
-						liveStreamVideo.onclick = null; // Quitar el evento para no interferir después
+					showPlaceholder("Transmisión lista. Haz clic aquí para reproducir.");
+
+					// Añadimos un listener de un solo uso para que el usuario inicie la reproducción.
+					const playOnClick = () => {
+						console.log("Intentando reproducir por clic del usuario...");
+						liveStreamVideo.play().then(() => {
+							console.log("¡Reproducción iniciada por el usuario!");
+							showStream();
+							// Removemos este listener una vez que ha funcionado.
+							liveStreamVideo.removeEventListener('click', playOnClick);
+						}).catch(err => {
+							console.error("La reproducción por clic también falló:", err);
+						});
 					};
+					liveStreamVideo.addEventListener('click', playOnClick);
 				});
 			}
-			
-			showStream();
 		};
 		// =================================================================
 
