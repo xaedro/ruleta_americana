@@ -10,6 +10,8 @@ import uuid  # Importamos uuid para generar IDs únicos
 from fastapi import (FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -22,6 +24,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # --- CONFIGURACIÓN Y ESTADO GLOBAL ---
 SECRET_KEY = "tu_clave_secreta_super_dificil"
