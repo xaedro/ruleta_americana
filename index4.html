@@ -57,8 +57,8 @@
             { urls: 'stun:stun.l.google.com:19302' },
             {
               urls: 'turn:relay1.expressturn.com:3480',
-              username: 'TU_USERNAME_DE_EXPRESSTURN',      // <-- ¡REEMPLAZA ESTO!
-              credential: 'TU_PASSWORD_DE_EXPRESSTURN' // <-- ¡REEMPLAZA ESTO!
+              username: '000000002067441357',      // <-- ¡REEMPLAZA ESTO!
+              credential: 'ZWtqCZGCwebs2UeE8c8ryeqBHN8=' // <-- ¡REEMPLAZA ESTO!
             }
         ]
     };
@@ -100,68 +100,105 @@
     }
 
     // --- Lógica de WebSocket ---
-    function connectWebSocket() {
-        const username = nameInput.value.trim();
-        if (!username) return;
+	
+	function connectWebSocket() {
+		const username = nameInput.value.trim();
+		if (!username) {
+			alert("Por favor, ingresa un nombre.");
+			return;
+		}
 
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = window.location.host;
-        ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/users`);
+		const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+		const wsHost = window.location.host;
+		ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/users`);
 
-        ws.onopen = () => {
-            console.log("Conectado al servidor.");
-            ws.send(JSON.stringify({ type: "login", name: username }));
-        };
+		let heartbeatInterval; // Para nuestro latido
 
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            console.log("Mensaje recibido:", data);
-            
-            switch (data.type) {
-                case 'login_success':
-                    userRole = data.role;
-                    loginContainer.style.display = 'none';
-                    mainContainer.style.display = 'block';
-                    if (userRole === 'streamer') captureControls.style.display = 'block';
-                    break;
+		ws.onopen = () => {
+			console.log("Conectado al servidor.");
+			ws.send(JSON.stringify({ type: "login", name: username }));
 
-                case 'stream_started':
-                    showStream();
-                    if (userRole === 'viewer') startViewing();
-                    break;
-                
-                case 'stream_ended':
-                    isStreaming = false;
-                    showPlaceholder("La transmisión ha finalizado.");
-                    if (userRole === 'streamer') {
-                        startButton.disabled = false;
-                        startButton.textContent = "INICIAR TRANSMISIÓN";
-                        if (localStream) localStream.getTracks().forEach(track => track.stop());
-                        localStream = null;
-                        Object.values(peerConnections).forEach(pc => pc.close());
-                        peerConnections = {};
-                    } else {
-                        if (peerConnection) peerConnection.close();
-                        peerConnection = null;
-                    }
-                    break;
+			// Iniciar el heartbeat para mantener la conexión viva
+			heartbeatInterval = setInterval(() => {
+				if (ws.readyState === WebSocket.OPEN) {
+					ws.send(JSON.stringify({ type: 'ping' }));
+				}
+			}, 25000); // Cada 25 segundos
+		};
 
-                // --- Casos de Señalización WebRTC ---
-                case 'offer':
-                    if (userRole === 'streamer') handleOffer(data.offer, data.from_id);
-                    break;
-                case 'answer':
-                    if (userRole === 'viewer') handleAnswer(data.answer);
-                    break;
-                case 'candidate':
-                    handleCandidate(data.candidate, data.from_id);
-                    break;
-            }
-        };
+		ws.onmessage = (event) => {
+			try {
+				const data = JSON.parse(event.data);
+				
+				// Ignorar las respuestas del heartbeat
+				if (data.type === 'pong') {
+					return;
+				}
 
-        ws.onclose = () => { console.log("Conexión cerrada. Recarga la página para reconectar."); };
-        ws.onerror = (error) => { console.error("Error en WebSocket:", error); };
-    }
+				console.log("Mensaje recibido:", data);
+				
+				// Tu switch case existente para manejar los mensajes de la aplicación
+				switch (data.type) {
+					case 'login_success':
+						userRole = data.role;
+						loginContainer.style.display = 'none';
+						mainContainer.style.display = 'block';
+						if (userRole === 'streamer') captureControls.style.display = 'block';
+						break;
+
+					case 'stream_started':
+						showStream();
+						if (userRole === 'viewer') startViewing();
+						break;
+					
+					case 'stream_ended':
+						isStreaming = false;
+						showPlaceholder("La transmisión ha finalizado.");
+						if (userRole === 'streamer') {
+							startButton.disabled = false;
+							startButton.textContent = "INICIAR TRANSMISIÓN";
+							if (localStream) localStream.getTracks().forEach(track => track.stop());
+							localStream = null;
+							Object.values(peerConnections).forEach(pc => pc.close());
+							peerConnections = {};
+						} else {
+							if (peerConnection) peerConnection.close();
+							peerConnection = null;
+							liveStreamVideo.srcObject = null; // Limpiar el video del espectador
+						}
+						break;
+
+					case 'offer':
+						if (userRole === 'streamer') handleOffer(data.offer, data.from_id);
+						break;
+					case 'answer':
+						if (userRole === 'viewer') handleAnswer(data.answer, data.from_id);
+						break;
+					case 'candidate':
+						handleCandidate(data.candidate, data.from_id);
+						break;
+				}
+			} catch (e) {
+				console.error("Error al procesar el mensaje o mensaje no es JSON:", event.data, e);
+			}
+		};
+
+		ws.onclose = () => {
+			console.log("Conexión cerrada. Intentando reconectar en 3 segundos...");
+			clearInterval(heartbeatInterval); // Detener el heartbeat
+			// Limpiar el estado para forzar un re-login
+			loginContainer.style.display = 'block';
+			mainContainer.style.display = 'none';
+			// Intentar reconectar después de un breve retraso
+			setTimeout(connectWebSocket, 3000); 
+		};
+
+		ws.onerror = (error) => {
+			console.error("Error en WebSocket:", error);
+			// El evento onclose se disparará automáticamente después de un error,
+			// así que la lógica de reconexión se activará.
+		};
+	}
 
     // --- Lógica WebRTC ---
 

@@ -85,7 +85,7 @@ manager = ConnectionManager()
 # Servir la versión antigua (renombrada a main2.html)
 @app.get("/old")
 async def get_old_version():
-    return FileResponse(os.path.join(os.path.dirname(__file__), "main3.html"))
+    return FileResponse(os.path.join(os.path.dirname(__file__), "index3.html"))
 
 # Servir la nueva versión WebRTC (index4.html)
 @app.get("/")
@@ -115,8 +115,12 @@ async def websocket_users(websocket: WebSocket):
             data = json.loads(data_str)
             msg_type = data.get("type")
 
+        # --- MANEJO DEL HEARTBEAT ---
+            if msg_type == "ping":
+                await websocket.send_text(json.dumps({"type": "pong"}))
+                continue # No proceses ni reenvíes este mensaje
             # --- LÓGICA DE SEÑALIZACIÓN WEBRTC ---
-            if msg_type == "offer":
+            elif msg_type == "offer":
                 # Un espectador envía una oferta al streamer
                 if manager.streamer_id:
                     print(f"Reenviando oferta de {client_id} a streamer {manager.streamer_id}")
