@@ -203,6 +203,7 @@
     // --- Lógica WebRTC ---
 
     // El espectador inicia la conexión
+	/*
     function startViewing() {
         console.log("Iniciando conexión WebRTC como espectador...");
         peerConnection = new RTCPeerConnection(configuration);
@@ -233,7 +234,87 @@
                 ws.send(JSON.stringify({ type: 'offer', offer: peerConnection.localDescription }));
             });
     }
-    
+    */
+	
+	// En index4.html
+
+	function startViewing() {
+		console.log("Iniciando conexión WebRTC como espectador...");
+		
+		// =================================================================
+		// PASO 1: CREAR LA CONEXIÓN (¡ESTA LÍNEA ES FUNDAMENTAL!)
+		// Aquí es donde se crea el objeto PeerConnection usando tu
+		// configuración de servidores STUN y TURN.
+		peerConnection = new RTCPeerConnection(configuration);
+		// =================================================================
+
+
+		// =================================================================
+		// PASO 2: DEFINIR QUÉ HACER CUANDO LLEGUEN LOS DATOS
+		// Este es el bloque que modificamos para forzar el play.
+		peerConnection.ontrack = (event) => {
+			console.log("Track de video/audio remoto recibido.");
+			if (liveStreamVideo.srcObject !== event.streams[0]) {
+				liveStreamVideo.srcObject = event.streams[0];
+				console.log("Asignando nuevo stream al elemento de video.");
+			}
+
+			// Forzar la reproducción por si el autoplay falla
+			const playPromise = liveStreamVideo.play();
+			if (playPromise !== undefined) {
+				playPromise.catch(error => {
+					console.error("La reproducción automática fue bloqueada:", error);
+					// Si falla, mostramos un mensaje para que el usuario haga clic
+					showPlaceholder("La transmisión está lista. Haz clic en el video para reproducir.");
+					// Añadimos un listener de clic para iniciar la reproducción manualmente
+					liveStreamVideo.onclick = () => {
+						liveStreamVideo.play();
+						showStream();
+						liveStreamVideo.onclick = null; // Quitar el evento para no interferir después
+					};
+				});
+			}
+			
+			showStream();
+		};
+		// =================================================================
+
+
+		// =================================================================
+		// PASO 3: DEFINIR QUÉ HACER CON LOS CANDIDATOS ICE
+		// Esto es para enviar nuestra información de red al otro par.
+		peerConnection.onicecandidate = (event) => {
+			if (event.candidate) {
+				ws.send(JSON.stringify({ 
+					type: 'candidate', 
+					candidate: event.candidate,
+					target_id: "streamer" // El servidor sabrá que es para el streamer
+				}));
+			}
+		};
+		// =================================================================
+
+
+		// =================================================================
+		// PASO 4: CONFIGURAR QUÉ QUEREMOS RECIBIR
+		// Le decimos a la conexión que estamos esperando recibir video y audio.
+		peerConnection.addTransceiver('video', {'direction': 'recvonly'});
+		peerConnection.addTransceiver('audio', {'direction': 'recvonly'});
+		// =================================================================
+
+
+		// =================================================================
+		// PASO 5: INICIAR LA NEGOCIACIÓN
+		// Creamos y enviamos la "oferta" para empezar la conexión.
+		peerConnection.createOffer()
+			.then(offer => peerConnection.setLocalDescription(offer))
+			.then(() => {
+				ws.send(JSON.stringify({ type: 'offer', offer: peerConnection.localDescription }));
+			})
+			.catch(error => console.error("Error al crear la oferta:", error));
+		// =================================================================
+	}
+
     // El streamer maneja una oferta de un espectador
     async function handleOffer(offer, viewerId) {
         console.log(`Manejando oferta de ${viewerId}`);
