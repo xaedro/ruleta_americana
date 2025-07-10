@@ -11,6 +11,32 @@
         .video-container { width: 100%; max-width: 600px; background-color: #000; border: 1px solid #ccc; position: relative; }
         #live-stream { width: 100%; display: block; }
         .video-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #888; font-size: 1.5em; text-align: center; }
+		#welcome-container {
+			display: none; /* Oculto por defecto */
+			text-align: center;
+			margin-top: 50px;
+			padding: 20px;
+			border: 1px solid #ccc;
+			border-radius: 8px;
+			max-width: 600px;
+			margin-left: auto;
+			margin-right: auto;
+		}
+
+		#enter-game-button {
+			padding: 15px 30px;
+			font-size: 18px;
+			font-weight: bold;
+			color: white;
+			background-color: #007bff;
+			border: none;
+			border-radius: 5px;
+			cursor: pointer;
+			margin-top: 20px;
+		}
+		#enter-game-button:hover {
+			background-color: #0056b3;
+		}
     </style>
 </head>
 <body>
@@ -19,6 +45,13 @@
         <h1>Bienvenido a la Ruleta Americana</h1>
         <p>Por favor, ingresa tu nombre para continuar.</p>
         <form id="login-form"><input type="text" id="name-input" placeholder="Tu nombre" required><button type="submit">Ingresar</button></form>
+    </div>
+	<div id="welcome-container">
+        <h1 id="welcome-message"></h1>
+        <p>¡Todo listo para empezar!</p>
+        <!-- Aquí podrías poner tu video tutorial si quisieras -->
+        <!-- <video src="tutorial.mp4" controls></video> -->
+        <button id="enter-game-button">ENTRAR AL JUEGO</button>
     </div>
     <div id="main-container">
         <h1>Ruleta Americana (Stream en Vivo - WebRTC)</h1>
@@ -43,234 +76,199 @@
     const captureControls = document.getElementById('capture-controls');
     const liveStreamVideo = document.getElementById('live-stream');
     const streamPlaceholder = document.getElementById('streamPlaceholder');
-    
+    // Nuevas referencias para el flujo de bienvenida
+    const welcomeContainer = document.getElementById('welcome-container');
+    const welcomeMessage = document.getElementById('welcome-message');
+    const enterGameButton = document.getElementById('enter-game-button');
+    // Referencias a los elementos de tu juego (asegúrate de que los IDs coincidan en tu HTML)
+    const nombreLogueadoElem = document.getElementById('nombre-logueado');
+
     // --- Estado Global y Configuración ---
+    let ws = null;
     let userRole = "viewer";
     let isStreaming = false;
     let localStream; // Para el streamer
     let peerConnections = {}; // Streamer: guarda una conexión por cada espectador
-    let peerConnection;     // Espectador: solo tiene una conexión con el streamer
-	let ws = null; 
-	
+    let peerConnection; // Espectador: solo tiene una conexión con el streamer
+    let currentUsername = ''; // Para guardar el nombre del usuario
+    
     const configuration = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             {
               urls: 'turn:relay1.expressturn.com:3480',
-              username: '000000002067441357',      // <-- ¡REEMPLAZA ESTO!
-              credential: 'ZWtqCZGCwebs2UeE8c8ryeqBHN8=' // <-- ¡REEMPLAZA ESTO!
+              username: '000000002067441357',
+              credential: 'ZWtqCZGCwebs2UeE8c8ryeqBHN8='
             }
         ]
     };
     
-	
-	
-    // --- Lógica de la Aplicación ---
+    // ===================================================================
+    // --- INICIO DEL FLUJO DE LA APLICACIÓN ---
+    // ===================================================================
+
+    // 1. El usuario envía el formulario de login
     loginForm.onsubmit = (event) => {
-		event.preventDefault();
-		const username = nameInput.value.trim();
-		if (username) {
-			// Solo intentamos conectar si no hay ya una conexión activa o conectando
-			if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-				connectWebSocket(username);
-			} else {
-				console.log("Ya se está intentando una conexión.");
-			}
-		} else {
-			alert("Por favor, ingresa un nombre.");
-		}
-	};
+        event.preventDefault();
+        const username = nameInput.value.trim();
+        if (username) {
+            if (!ws || ws.readyState === WebSocket.CLOSED) {
+                currentUsername = username; // Guardamos el nombre
+                connectWebSocket(username);
+            } else {
+                console.log("Ya se está intentando una conexión.");
+            }
+        } else {
+            alert("Por favor, ingresa un nombre.");
+        }
+    };
 
+    // 2. El usuario (ya logueado) hace clic en el botón de "Entrar al Juego"
+    enterGameButton.onclick = () => {
+        // Este es el gesto de usuario que "calienta" el navegador
+        console.log("Usuario ha entrado al juego. Mostrando contenedor principal.");
+        welcomeContainer.style.display = 'none';
+        mainContainer.style.display = 'block';
 
+        if (userRole === 'streamer') {
+            captureControls.style.display = 'block';
+        }
+        
+        // Si el stream ya había empezado mientras estábamos en la pantalla de bienvenida,
+        // iniciamos la conexión WebRTC ahora.
+        if (userRole === 'viewer' && isStreaming) {
+            console.log("Stream ya está activo. Iniciando visualización...");
+            startViewing();
+        }
+    };
+
+    // 3. El streamer hace clic en "Iniciar Transmisión"
     startButton.onclick = async () => {
         if (userRole === 'streamer' && !isStreaming) {
             try {
                 localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                isStreaming = true;
+                isStreaming = true; // Actualizamos el estado primero
                 startButton.disabled = true;
                 startButton.textContent = "TRANSMITIENDO...";
-                liveStreamVideo.srcObject = localStream; // El streamer ve su propio stream
+                liveStreamVideo.srcObject = localStream;
                 liveStreamVideo.muted = true;
                 showStream();
+                
+                // Notificamos al servidor que el stream ha comenzado
                 ws.send(JSON.stringify({ type: 'start_stream' }));
 
+                // Listener para cuando el streamer detiene la compartición desde el navegador
                 localStream.getVideoTracks()[0].onended = () => {
                     ws.send(JSON.stringify({ type: 'stream_ended' }));
                 };
-            } catch (err) { console.error("Error al capturar pantalla:", err); }
+            } catch (err) { 
+                console.error("Error al capturar pantalla (el usuario pudo haber cancelado):", err.name); 
+            }
         }
     };
-    
-    // --- Funciones de UI ---
-    function showStream() {
-        liveStreamVideo.style.visibility = 'visible';
-        streamPlaceholder.style.display = 'none';
-    }
-    function showPlaceholder(message) {
-        liveStreamVideo.style.visibility = 'hidden';
-        streamPlaceholder.textContent = message;
-        streamPlaceholder.style.display = 'block';
-    }
 
-    // --- Lógica de WebSocket ---
-	function connectWebSocket(username) {
-		console.log("Intentando conectar WebSocket...");
-		
-		const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-		const wsHost = window.location.host;
-		ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/users`);
+    // ===================================================================
+    // --- LÓGICA DE WEBSOCKET ---
+    // ===================================================================
 
-		let heartbeatInterval;
+    function connectWebSocket(username) {
+        console.log("Intentando conectar WebSocket...");
+        
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.host;
+        ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/users`);
 
-		ws.onopen = () => {
-			console.log("Conectado al servidor. WebSocket está OPEN.");
-			ws.send(JSON.stringify({ type: "login", name: username }));
+        let heartbeatInterval;
 
-			heartbeatInterval = setInterval(() => {
-				if (ws.readyState === WebSocket.OPEN) {
-					ws.send(JSON.stringify({ type: 'ping' }));
-				}
-			}, 25000);
-		};
+        ws.onopen = () => {
+            console.log("Conectado al servidor. WebSocket está OPEN.");
+            ws.send(JSON.stringify({ type: "login", name: username }));
 
-		// En index4.html
-
-	ws.onmessage = (event) => {
-		console.log("RAW MESSAGE RECEIVED:", event.data);
-
-		try {
-			const data = JSON.parse(event.data);
-			
-			// Ignorar las respuestas del heartbeat (si las añadimos después)
-			if (data.type === 'pong') {
-				return;
-			}
-
-			switch (data.type) {
-				case 'login_success':
-					console.log("Procesando login_success. Rol:", data.role);
-					userRole = data.role;
-					loginContainer.style.display = 'none';
-					mainContainer.style.display = 'block';
-					if (userRole === 'streamer') {
-						captureControls.style.display = 'block';
-					}
-					// Guardamos el nombre de usuario para usarlo en las apuestas, etc.
-					currentUsername = nameInput.value.trim(); 
-					nombreLogueadoElem.textContent = currentUsername;
-					break;
-
-				case 'stream_started':
-					console.log("Recibido 'stream_started'. Rol actual:", userRole);
-					showStream();
-					if (userRole === 'viewer') {
-						startViewing();
-					}
-					break;
-				
-				case 'stream_ended':
-					console.log("Recibido 'stream_ended'.");
-					isStreaming = false;
-					showPlaceholder("La transmisión ha finalizado.");
-					if (userRole === 'streamer') {
-						startButton.disabled = false;
-						startButton.textContent = "INICIAR TRANSMISIÓN";
-						if (localStream) {
-							localStream.getTracks().forEach(track => track.stop());
-						}
-						localStream = null;
-						Object.values(peerConnections).forEach(pc => pc.close());
-						peerConnections = {};
-					} else {
-						if (peerConnection) {
-							peerConnection.close();
-						}
-						peerConnection = null;
-						liveStreamVideo.srcObject = null;
-					}
-					break;
-
-				// --- Casos de Señalización WebRTC ---
-				case 'offer':
-					if (userRole === 'streamer') {
-						handleOffer(data.offer, data.from_id);
-					}
-					break;
-				case 'answer':
-					if (userRole === 'viewer') {
-						handleAnswer(data.answer); // from_id no es necesario aquí para el viewer
-					}
-					break;
-				case 'candidate':
-					handleCandidate(data.candidate, data.from_id);
-					break;
-				
-				// --- Casos para la lógica de tu juego (puedes añadir los que necesites) ---
-				case 'evento_juego':
-					// ... tu lógica para mostrar eventos ...
-					break;
-			}
-		} catch (e) {
-			// Esto es para mensajes que no son JSON, como los que envías desde tus endpoints HTTP
-			console.log("Mensaje de texto plano recibido:", event.data);
-		}
-	};
-
-		ws.onclose = (event) => {
-			console.log("Conexión cerrada.", event.code, event.reason);
-			clearInterval(heartbeatInterval);
-			ws = null; // ¡Importante! Limpiamos la variable para permitir un nuevo intento
-
-			// No reconectamos automáticamente, solo informamos al usuario.
-			loginContainer.style.display = 'block';
-			mainContainer.style.display = 'none';
-			alert("Se ha perdido la conexión con el servidor. Por favor, intenta ingresar de nuevo.");
-		};
-
-		ws.onerror = (error) => {
-			console.error("Error en WebSocket:", error);
-			// onclose se llamará después de un error.
-		};
-	}
-
-    // --- Lógica WebRTC ---
-
-    // El espectador inicia la conexión
-	/*
-    function startViewing() {
-        console.log("Iniciando conexión WebRTC como espectador...");
-        peerConnection = new RTCPeerConnection(configuration);
-
-        peerConnection.ontrack = (event) => {
-            console.log("Track de video/audio remoto recibido.");
-            liveStreamVideo.srcObject = event.streams[0];
-            showStream();
+            heartbeatInterval = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 25000);
         };
 
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                ws.send(JSON.stringify({ 
-                    type: 'candidate', 
-                    candidate: event.candidate,
-                    target_id: "streamer" // El servidor sabrá a quién enviarlo
-                }));
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'pong') return; // Ignorar pongs
+                
+                console.log("Mensaje recibido:", data);
+
+                switch (data.type) {
+                    case 'login_success':
+                        userRole = data.role;
+                        // Mostramos la pantalla de bienvenida, no la del juego directamente
+                        loginContainer.style.display = 'none';
+                        welcomeContainer.style.display = 'block';
+                        welcomeMessage.textContent = `¡Bienvenido, ${currentUsername}!`;
+                        break;
+
+                    case 'stream_started':
+                        isStreaming = true;
+                        // Solo actuamos si ya estamos en la pantalla del juego
+                        if (mainContainer.style.display === 'block' && userRole === 'viewer') {
+                            showStream();
+                            startViewing();
+                        }
+                        break;
+                    
+                    case 'stream_ended':
+                        isStreaming = false;
+                        showPlaceholder("La transmisión ha finalizado.");
+                        if (userRole === 'streamer') {
+                            startButton.disabled = false;
+                            startButton.textContent = "INICIAR TRANSMISIÓN";
+                            if (localStream) localStream.getTracks().forEach(track => track.stop());
+                            localStream = null;
+                            Object.values(peerConnections).forEach(pc => pc.close());
+                            peerConnections = {};
+                        } else {
+                            if (peerConnection) peerConnection.close();
+                            peerConnection = null;
+                            liveStreamVideo.srcObject = null;
+                        }
+                        break;
+
+                    case 'offer':
+                        if (userRole === 'streamer') handleOffer(data.offer, data.from_id);
+                        break;
+                    case 'answer':
+                        if (userRole === 'viewer') handleAnswer(data.answer);
+                        break;
+                    case 'candidate':
+                        handleCandidate(data.candidate, data.from_id);
+                        break;
+                }
+            } catch (e) {
+                console.log("Mensaje de texto plano recibido:", event.data);
             }
         };
 
-        // El espectador añade transceptores para recibir video y audio
-        peerConnection.addTransceiver('video', {'direction': 'recvonly'});
-        peerConnection.addTransceiver('audio', {'direction': 'recvonly'});
+        ws.onclose = (event) => {
+            console.log("Conexión cerrada.", event.code, event.reason);
+            clearInterval(heartbeatInterval);
+            ws = null;
+            // Ocultamos todos los contenedores y mostramos solo el de login
+            loginContainer.style.display = 'block';
+            mainContainer.style.display = 'none';
+            welcomeContainer.style.display = 'none';
+            alert("Se ha perdido la conexión con el servidor. Por favor, ingresa de nuevo.");
+        };
 
-        peerConnection.createOffer()
-            .then(offer => peerConnection.setLocalDescription(offer))
-            .then(() => {
-                ws.send(JSON.stringify({ type: 'offer', offer: peerConnection.localDescription }));
-            });
+        ws.onerror = (error) => {
+            console.error("Error en WebSocket:", error);
+        };
     }
-    */
-	
-	// En index4.html
 
+///////////////////////////////////////////////////////////////////////////////
+// ===================================================================
+    // --- LÓGICA DE WEBRTC ---
+    // ===================================================================
+	
 	function startViewing() {
 		console.log("Iniciando conexión WebRTC como espectador...");
 		
@@ -395,15 +393,15 @@
             target_id: viewerId 
         }));
     }
-
-    // El espectador maneja la respuesta del streamer
+	
+	    // El espectador maneja la respuesta del streamer
     async function handleAnswer(answer) {
         if (peerConnection) {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
         }
     }
-
-    // Ambos manejan candidatos del otro
+	
+	// Ambos manejan candidatos del otro
     async function handleCandidate(candidate, fromId) {
 		// Para el streamer, pc será peerConnections[fromId]
 		// Para el viewer, pc será la única 'peerConnection' que tiene
@@ -416,6 +414,24 @@
 			}
 		}
 	}
+	
+	// --- Funciones de UI ---
+    function showStream() {
+        liveStreamVideo.style.visibility = 'visible';
+        streamPlaceholder.style.display = 'none';
+    }
+	
+    function showPlaceholder(message) {
+        liveStreamVideo.style.visibility = 'hidden';
+        streamPlaceholder.textContent = message;
+        streamPlaceholder.style.display = 'block';
+    }
+	
+
+
+
+
+    
 </script>
 </body>
 </html>
