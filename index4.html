@@ -133,9 +133,88 @@
 			}, 25000);
 		};
 
-		ws.onmessage = (event) => {
-			// ... (el contenido de onmessage no cambia, pega el tuyo aquí) ...
-		};
+		// En index4.html
+
+	ws.onmessage = (event) => {
+		console.log("RAW MESSAGE RECEIVED:", event.data);
+
+		try {
+			const data = JSON.parse(event.data);
+			
+			// Ignorar las respuestas del heartbeat (si las añadimos después)
+			if (data.type === 'pong') {
+				return;
+			}
+
+			switch (data.type) {
+				case 'login_success':
+					console.log("Procesando login_success. Rol:", data.role);
+					userRole = data.role;
+					loginContainer.style.display = 'none';
+					mainContainer.style.display = 'block';
+					if (userRole === 'streamer') {
+						captureControls.style.display = 'block';
+					}
+					// Guardamos el nombre de usuario para usarlo en las apuestas, etc.
+					currentUsername = nameInput.value.trim(); 
+					nombreLogueadoElem.textContent = currentUsername;
+					break;
+
+				case 'stream_started':
+					console.log("Recibido 'stream_started'. Rol actual:", userRole);
+					showStream();
+					if (userRole === 'viewer') {
+						startViewing();
+					}
+					break;
+				
+				case 'stream_ended':
+					console.log("Recibido 'stream_ended'.");
+					isStreaming = false;
+					showPlaceholder("La transmisión ha finalizado.");
+					if (userRole === 'streamer') {
+						startButton.disabled = false;
+						startButton.textContent = "INICIAR TRANSMISIÓN";
+						if (localStream) {
+							localStream.getTracks().forEach(track => track.stop());
+						}
+						localStream = null;
+						Object.values(peerConnections).forEach(pc => pc.close());
+						peerConnections = {};
+					} else {
+						if (peerConnection) {
+							peerConnection.close();
+						}
+						peerConnection = null;
+						liveStreamVideo.srcObject = null;
+					}
+					break;
+
+				// --- Casos de Señalización WebRTC ---
+				case 'offer':
+					if (userRole === 'streamer') {
+						handleOffer(data.offer, data.from_id);
+					}
+					break;
+				case 'answer':
+					if (userRole === 'viewer') {
+						handleAnswer(data.answer); // from_id no es necesario aquí para el viewer
+					}
+					break;
+				case 'candidate':
+					handleCandidate(data.candidate, data.from_id);
+					break;
+				
+				// --- Casos para la lógica de tu juego (puedes añadir los que necesites) ---
+				case 'evento_juego':
+					// ... tu lógica para mostrar eventos ...
+					break;
+			}
+		} catch (e) {
+			// Esto es para mensajes que no son JSON, como los que envías desde tus endpoints HTTP
+			console.log("Mensaje de texto plano recibido:", event.data);
+		}
+	};
 
 		ws.onclose = (event) => {
 			console.log("Conexión cerrada.", event.code, event.reason);
@@ -307,15 +386,17 @@
 
     // Ambos manejan candidatos del otro
     async function handleCandidate(candidate, fromId) {
-        const pc = userRole === 'streamer' ? peerConnections[fromId] : peerConnection;
-        if (pc) {
-            try {
-                await pc.addIceCandidate(new RTCIceCandidate(candidate));
-            } catch (e) {
-                console.error("Error añadiendo candidato ICE:", e);
-            }
-        }
-    }
+		// Para el streamer, pc será peerConnections[fromId]
+		// Para el viewer, pc será la única 'peerConnection' que tiene
+		const pc = (userRole === 'streamer') ? peerConnections[fromId] : peerConnection;
+		if (pc) {
+			try {
+				await pc.addIceCandidate(new RTCIceCandidate(candidate));
+			} catch (e) {
+				console.error("Error añadiendo candidato ICE:", e);
+			}
+		}
+	}
 </script>
 </body>
 </html>
