@@ -65,9 +65,16 @@
     
     // --- Lógica de la Aplicación ---
     loginForm.onsubmit = (event) => {
-        event.preventDefault();
-        connectWebSocket();
-    };
+		event.preventDefault();
+		// Ya no conectamos aquí, solo guardamos el nombre y llamamos a la función
+		const username = nameInput.value.trim();
+		if (username) {
+			connectWebSocket(username); // Le pasamos el nombre de usuario
+		} else {
+			alert("Por favor, ingresa un nombre.");
+		}
+	};
+
 
     startButton.onclick = async () => {
         if (userRole === 'streamer' && !isStreaming) {
@@ -100,11 +107,9 @@
     }
 
     // --- Lógica de WebSocket ---
-	
-	function connectWebSocket() {
-		const username = nameInput.value.trim();
-		if (!username) {
-			alert("Por favor, ingresa un nombre.");
+	function connectWebSocket(username) {
+		if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+			console.log("Ya existe una conexión WebSocket o se está intentando una.");
 			return;
 		}
 
@@ -112,91 +117,42 @@
 		const wsHost = window.location.host;
 		ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/users`);
 
-		let heartbeatInterval; // Para nuestro latido
+		let heartbeatInterval;
 
+		// --- ¡LA LÓGICA CLAVE SE MUEVE AQUÍ DENTRO! ---
 		ws.onopen = () => {
-			console.log("Conectado al servidor.");
+			console.log("Conectado al servidor. WebSocket está OPEN.");
+			
+			// 1. AHORA que está abierto, enviamos el login
 			ws.send(JSON.stringify({ type: "login", name: username }));
 
-			// Iniciar el heartbeat para mantener la conexión viva
+			// 2. AHORA que está abierto, iniciamos el heartbeat
 			heartbeatInterval = setInterval(() => {
 				if (ws.readyState === WebSocket.OPEN) {
 					ws.send(JSON.stringify({ type: 'ping' }));
 				}
-			}, 25000); // Cada 25 segundos
+			}, 25000);
 		};
+		// ----------------------------------------------------
 
 		ws.onmessage = (event) => {
-			try {
-				const data = JSON.parse(event.data);
-				
-				// Ignorar las respuestas del heartbeat
-				if (data.type === 'pong') {
-					return;
-				}
-
-				console.log("Mensaje recibido:", data);
-				
-				// Tu switch case existente para manejar los mensajes de la aplicación
-				switch (data.type) {
-					case 'login_success':
-						userRole = data.role;
-						loginContainer.style.display = 'none';
-						mainContainer.style.display = 'block';
-						if (userRole === 'streamer') captureControls.style.display = 'block';
-						break;
-
-					case 'stream_started':
-						showStream();
-						if (userRole === 'viewer') startViewing();
-						break;
-					
-					case 'stream_ended':
-						isStreaming = false;
-						showPlaceholder("La transmisión ha finalizado.");
-						if (userRole === 'streamer') {
-							startButton.disabled = false;
-							startButton.textContent = "INICIAR TRANSMISIÓN";
-							if (localStream) localStream.getTracks().forEach(track => track.stop());
-							localStream = null;
-							Object.values(peerConnections).forEach(pc => pc.close());
-							peerConnections = {};
-						} else {
-							if (peerConnection) peerConnection.close();
-							peerConnection = null;
-							liveStreamVideo.srcObject = null; // Limpiar el video del espectador
-						}
-						break;
-
-					case 'offer':
-						if (userRole === 'streamer') handleOffer(data.offer, data.from_id);
-						break;
-					case 'answer':
-						if (userRole === 'viewer') handleAnswer(data.answer, data.from_id);
-						break;
-					case 'candidate':
-						handleCandidate(data.candidate, data.from_id);
-						break;
-				}
-			} catch (e) {
-				console.error("Error al procesar el mensaje o mensaje no es JSON:", event.data, e);
-			}
+			// ... (el contenido de ws.onmessage no necesita cambios, está bien como lo tienes) ...
+			// ... (pega aquí tu switch case completo) ...
 		};
 
 		ws.onclose = () => {
-			console.log("Conexión cerrada. Intentando reconectar en 3 segundos...");
-			clearInterval(heartbeatInterval); // Detener el heartbeat
-			// Limpiar el estado para forzar un re-login
+			console.log("Conexión cerrada.");
+			clearInterval(heartbeatInterval);
+			// Podríamos intentar reconectar, pero por ahora lo dejamos simple.
+			// Volver a la pantalla de login es una buena opción.
 			loginContainer.style.display = 'block';
 			mainContainer.style.display = 'none';
-			// Intentar reconectar después de un breve retraso
-			setTimeout(connectWebSocket, 3000); 
+			alert("Se ha perdido la conexión con el servidor. Por favor, ingresa de nuevo.");
 		};
 
 		ws.onerror = (error) => {
 			console.error("Error en WebSocket:", error);
-			// El evento onclose se disparará automáticamente después de un error,
-			// así que la lógica de reconexión se activará.
+			// onclose se llamará después, manejando el reseteo de la UI.
 		};
 	}
 
