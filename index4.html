@@ -51,7 +51,8 @@
     let localStream; // Para el streamer
     let peerConnections = {}; // Streamer: guarda una conexión por cada espectador
     let peerConnection;     // Espectador: solo tiene una conexión con el streamer
-
+	let ws = null; 
+	
     const configuration = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -63,13 +64,19 @@
         ]
     };
     
+	
+	
     // --- Lógica de la Aplicación ---
     loginForm.onsubmit = (event) => {
 		event.preventDefault();
-		// Ya no conectamos aquí, solo guardamos el nombre y llamamos a la función
 		const username = nameInput.value.trim();
 		if (username) {
-			connectWebSocket(username); // Le pasamos el nombre de usuario
+			// Solo intentamos conectar si no hay ya una conexión activa o conectando
+			if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+				connectWebSocket(username);
+			} else {
+				console.log("Ya se está intentando una conexión.");
+			}
 		} else {
 			alert("Por favor, ingresa un nombre.");
 		}
@@ -108,51 +115,43 @@
 
     // --- Lógica de WebSocket ---
 	function connectWebSocket(username) {
-		if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-			console.log("Ya existe una conexión WebSocket o se está intentando una.");
-			return;
-		}
-
+		console.log("Intentando conectar WebSocket...");
+		
 		const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 		const wsHost = window.location.host;
 		ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/users`);
 
 		let heartbeatInterval;
 
-		// --- ¡LA LÓGICA CLAVE SE MUEVE AQUÍ DENTRO! ---
 		ws.onopen = () => {
 			console.log("Conectado al servidor. WebSocket está OPEN.");
-			
-			// 1. AHORA que está abierto, enviamos el login
 			ws.send(JSON.stringify({ type: "login", name: username }));
 
-			// 2. AHORA que está abierto, iniciamos el heartbeat
 			heartbeatInterval = setInterval(() => {
 				if (ws.readyState === WebSocket.OPEN) {
 					ws.send(JSON.stringify({ type: 'ping' }));
 				}
 			}, 25000);
 		};
-		// ----------------------------------------------------
 
 		ws.onmessage = (event) => {
-			// ... (el contenido de ws.onmessage no necesita cambios, está bien como lo tienes) ...
-			// ... (pega aquí tu switch case completo) ...
+			// ... (el contenido de onmessage no cambia, pega el tuyo aquí) ...
 		};
 
-		ws.onclose = () => {
-			console.log("Conexión cerrada.");
+		ws.onclose = (event) => {
+			console.log("Conexión cerrada.", event.code, event.reason);
 			clearInterval(heartbeatInterval);
-			// Podríamos intentar reconectar, pero por ahora lo dejamos simple.
-			// Volver a la pantalla de login es una buena opción.
+			ws = null; // ¡Importante! Limpiamos la variable para permitir un nuevo intento
+
+			// No reconectamos automáticamente, solo informamos al usuario.
 			loginContainer.style.display = 'block';
 			mainContainer.style.display = 'none';
-			alert("Se ha perdido la conexión con el servidor. Por favor, ingresa de nuevo.");
+			alert("Se ha perdido la conexión con el servidor. Por favor, intenta ingresar de nuevo.");
 		};
 
 		ws.onerror = (error) => {
 			console.error("Error en WebSocket:", error);
-			// onclose se llamará después, manejando el reseteo de la UI.
+			// onclose se llamará después de un error.
 		};
 	}
 
