@@ -563,7 +563,6 @@
     let peerConnections = {};
     let peerConnection;
     let currentUsername = '';
-    // Almacenar candidatos ICE pendientes hasta configurar remoteDescription
     const pendingCandidates = {};
 
     const configuration = {
@@ -673,6 +672,7 @@
                 switch (data.type) {
                     case 'login_success':
                         userRole = data.role;
+                        console.log(`Rol asignado: ${userRole}`);
                         loginContainer.style.display = 'none';
                         welcomeContainer.style.display = 'block';
                         welcomeMessage.textContent = `¡Bienvenido, ${currentUsername}!`;
@@ -680,6 +680,7 @@
 
                     case 'stream_started':
                         isStreaming = true;
+                        console.log("Stream iniciado. Estado isStreaming:", isStreaming);
                         if (mainContainer.style.display === 'block' && userRole === 'viewer') {
                             showStream();
                             startViewing();
@@ -688,6 +689,7 @@
                     
                     case 'stream_ended':
                         isStreaming = false;
+                        console.log("Stream finalizado. Estado isStreaming:", isStreaming);
                         showPlaceholder("La transmisión ha finalizado.");
                         if (userRole === 'streamer') {
                             startButton.disabled = false;
@@ -705,15 +707,18 @@
 
                     case 'offer':
                         if (userRole === 'streamer') {
+                            console.log(`Oferta recibida de ${data.from_id}`);
                             await handleOffer(data.offer, data.from_id);
                         }
                         break;
                     case 'answer':
                         if (userRole === 'streamer') {
+                            console.log(`Respuesta recibida de ${data.from_id}`);
                             await handleAnswer(data.answer, data.from_id);
                         }
                         break;
                     case 'candidate':
+                        console.log(`Candidato ICE recibido de ${data.from_id} para ${data.target_id}`);
                         await handleCandidate(data.candidate, data.from_id);
                         break;
                 }
@@ -742,7 +747,7 @@
         console.log("Iniciando conexión WebRTC como espectador...");
         peerConnection = new RTCPeerConnection(configuration);
 
-        // Almacenar candidatos ICE hasta que remoteDescription esté listo
+        // Almacenar candidatos ICE pendientes
         pendingCandidates['viewer'] = [];
 
         peerConnection.ontrack = (event) => {
@@ -787,7 +792,7 @@
 
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
-                console.log('ICE Candidate:', event.candidate);
+                console.log('Enviando candidato ICE:', event.candidate);
                 ws.send(JSON.stringify({ 
                     type: 'candidate', 
                     candidate: event.candidate,
@@ -796,13 +801,17 @@
             }
         };
 
-        peerConnection.addTransceiver('video', {'direction': 'recvonly'});
-        peerConnection.addTransceiver('audio', {'direction': 'recvonly'});
+        peerConnection.onconnectionstatechange = () => {
+            console.log("Estado de conexión WebRTC:", peerConnection.connectionState);
+        };
 
         try {
+            peerConnection.addTransceiver('video', {'direction': 'recvonly'});
+            peerConnection.addTransceiver('audio', {'direction': 'recvonly'});
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
-            ws.send(JSON.stringify({ type: 'offer', offer: peerConnection.localDescription }));
+            console.log("Oferta enviada:", peerConnection.localDescription);
+            ws.send(JSON.stringify({ type: 'offer', offer: peerConnection.localDescription, from_id: currentUsername, target_id: "streamer" }));
             // Procesar candidatos pendientes después de configurar localDescription
             if (pendingCandidates['viewer'].length > 0) {
                 console.log("Procesando candidatos pendientes para viewer...");
@@ -812,7 +821,7 @@
                 pendingCandidates['viewer'] = [];
             }
         } catch (error) {
-            console.error("Error al crear la oferta:", error);
+            console.error("Error al crear o enviar la oferta:", error);
         }
     }
 
@@ -821,11 +830,12 @@
         const pc = new RTCPeerConnection(configuration);
         peerConnections[viewerId] = pc;
 
-        // Almacenar candidatos ICE pendientes para este viewer
+        // Almacenar candidatos ICE pendientes
         pendingCandidates[viewerId] = [];
 
         pc.onicecandidate = event => {
             if (event.candidate) {
+                console.log(`Enviando candidato ICE para ${viewerId}:`, event.candidate);
                 ws.send(JSON.stringify({ 
                     type: 'candidate', 
                     candidate: event.candidate,
@@ -834,8 +844,13 @@
             }
         };
 
+        pc.onconnectionstatechange = () => {
+            console.log(`Estado de conexión WebRTC para ${viewerId}:`, pc.connectionState);
+        };
+
         try {
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
+            console.log(`remoteDescription configurada para ${viewerId}`);
             if (localStream) {
                 localStream.getTracks().forEach(track => {
                     pc.addTrack(track, localStream);
@@ -846,6 +861,7 @@
             }
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
+            console.log(`Respuesta enviada para ${viewerId}:`, answer);
             ws.send(JSON.stringify({ 
                 type: 'answer', 
                 answer: answer,
@@ -856,6 +872,7 @@
                 console.log(`Procesando candidatos pendientes para ${viewerId}...`);
                 for (const candidate of pendingCandidates[viewerId]) {
                     await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    console.log(`Candidato ICE añadido para ${viewerId}`);
                 }
                 pendingCandidates[viewerId] = [];
             }
@@ -869,11 +886,13 @@
         if (pc) {
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                console.log(`remoteDescription configurada para respuesta de ${fromId}`);
                 // Procesar candidatos pendientes después de configurar remoteDescription
                 if (pendingCandidates[fromId].length > 0) {
                     console.log(`Procesando candidatos pendientes para ${fromId}...`);
                     for (const candidate of pendingCandidates[fromId]) {
                         await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                        console.log(`Candidato ICE añadido para ${fromId}`);
                     }
                     pendingCandidates[fromId] = [];
                 }
