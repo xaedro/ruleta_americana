@@ -320,7 +320,7 @@
 		// =================================================================
 		// PASO 2: DEFINIR QUÉ HACER CUANDO LLEGUEN LOS DATOS
 		// Este es el bloque que modificamos para forzar el play.
-		peerConnectionpeerConnection.ontrack = (event) => {
+		peerConnection.ontrack = (event) => {
 			console.log("-> EVENTO ONTRACK DISPARADO");
 
 			const remoteStream = event.streams[0];
