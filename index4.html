@@ -608,11 +608,17 @@
         }
     };
 	
-	/*
+	
     startButton.onclick = async () => {
         if (userRole === 'streamer' && !isStreaming) {
             try {
                 localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+				localStream = await navigator.mediaDevices.getUserMedia({
+					video: {
+						deviceId: undefined // Let the user select the OBS Virtual Camera
+					},
+					audio: true // Capture audio if needed (e.g., game sound or microphone)
+				});
                 console.log("Stream capturado:", localStream.getVideoTracks(), localStream.getAudioTracks());
                 isStreaming = true;
                 startButton.disabled = true;
@@ -645,8 +651,8 @@
             }
         }
     };
-	*/
 	
+	/*
 	startButton.onclick = async () => {
 		if (isStreaming) return; // Prevent multiple clicks
 		isStreaming = true;
@@ -695,6 +701,7 @@
 			startButton.textContent = "INICIAR TRANSMISIÓN";
 		}
 	};
+	*/
 	
     // --- LÓGICA DE WEBSOCKET ---
     function connectWebSocket(username) {
