@@ -563,7 +563,9 @@
     let peerConnections = {};
     let peerConnection;
     let currentUsername = '';
-    
+    // Almacenar candidatos ICE pendientes hasta configurar remoteDescription
+    const pendingCandidates = {};
+
     const configuration = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -740,6 +742,9 @@
         console.log("Iniciando conexión WebRTC como espectador...");
         peerConnection = new RTCPeerConnection(configuration);
 
+        // Almacenar candidatos ICE hasta que remoteDescription esté listo
+        pendingCandidates['viewer'] = [];
+
         peerConnection.ontrack = (event) => {
             console.log("-> EVENTO ONTRACK DISPARADO");
             const remoteStream = event.streams[0];
@@ -798,6 +803,14 @@
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
             ws.send(JSON.stringify({ type: 'offer', offer: peerConnection.localDescription }));
+            // Procesar candidatos pendientes después de configurar localDescription
+            if (pendingCandidates['viewer'].length > 0) {
+                console.log("Procesando candidatos pendientes para viewer...");
+                for (const candidate of pendingCandidates['viewer']) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+                pendingCandidates['viewer'] = [];
+            }
         } catch (error) {
             console.error("Error al crear la oferta:", error);
         }
@@ -807,6 +820,9 @@
         console.log(`Manejando oferta de ${viewerId}`);
         const pc = new RTCPeerConnection(configuration);
         peerConnections[viewerId] = pc;
+
+        // Almacenar candidatos ICE pendientes para este viewer
+        pendingCandidates[viewerId] = [];
 
         pc.onicecandidate = event => {
             if (event.candidate) {
@@ -835,6 +851,14 @@
                 answer: answer,
                 target_id: viewerId 
             }));
+            // Procesar candidatos pendientes después de configurar remoteDescription
+            if (pendingCandidates[viewerId].length > 0) {
+                console.log(`Procesando candidatos pendientes para ${viewerId}...`);
+                for (const candidate of pendingCandidates[viewerId]) {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+                pendingCandidates[viewerId] = [];
+            }
         } catch (error) {
             console.error(`Error manejando oferta de ${viewerId}:`, error);
         }
@@ -845,6 +869,14 @@
         if (pc) {
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                // Procesar candidatos pendientes después de configurar remoteDescription
+                if (pendingCandidates[fromId].length > 0) {
+                    console.log(`Procesando candidatos pendientes para ${fromId}...`);
+                    for (const candidate of pendingCandidates[fromId]) {
+                        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    }
+                    pendingCandidates[fromId] = [];
+                }
             } catch (error) {
                 console.error(`Error manejando respuesta de ${fromId}:`, error);
             }
@@ -857,9 +889,20 @@
         const pc = (userRole === 'streamer') ? peerConnections[fromId] : peerConnection;
         if (pc) {
             try {
-                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                if (pc.remoteDescription && pc.remoteDescription.type) {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    console.log(`Candidato ICE añadido para ${fromId}`);
+                } else {
+                    console.log(`remoteDescription no está lista para ${fromId}. Almacenando candidato...`);
+                    if (!pendingCandidates[fromId] && userRole === 'streamer') {
+                        pendingCandidates[fromId] = [];
+                    } else if (!pendingCandidates['viewer'] && userRole === 'viewer') {
+                        pendingCandidates['viewer'] = [];
+                    }
+                    (userRole === 'streamer' ? pendingCandidates[fromId] : pendingCandidates['viewer']).push(candidate);
+                }
             } catch (e) {
-                console.error("Error añadiendo candidato ICE:", e);
+                console.error(`Error añadiendo candidato ICE para ${fromId}:`, e);
             }
         } else {
             console.warn(`No se encontró peerConnection para ${fromId}`);
