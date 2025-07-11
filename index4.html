@@ -612,7 +612,7 @@
     startButton.onclick = async () => {
         if (userRole === 'streamer' && !isStreaming) {
             try {
-                localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                //localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
 				localStream = await navigator.mediaDevices.getUserMedia({
 					video: {
 						deviceId: undefined // Let the user select the OBS Virtual Camera
