@@ -1016,7 +1016,7 @@
         #main-container, #capture-controls { display: none; }
         #login-container { text-align: center; margin-top: 50px; }
         .video-container {
-            width: 100%; /* Ocupa el ancho disponible de la página */
+            width: 50%; /* Ancho inicial del 50% */
             background-color: #000;
             border: 1px solid #ccc;
             position: relative;
@@ -1198,13 +1198,15 @@
             liveStreamVideo.muted = true;
             showStream();
 
-            // Ajustar la relación de aspecto del contenedor para el streamer
+            // Ajustar el ancho y la relación de aspecto del contenedor para el streamer
             const videoTrack = localStream.getVideoTracks()[0];
             if (videoTrack) {
                 const settings = videoTrack.getSettings();
+                const width = settings.width;
                 const aspectRatio = settings.width / settings.height;
                 console.log(`Resolución del stream capturado: ${settings.width}x${settings.height}, Aspect Ratio: ${aspectRatio}`);
-                videoContainer.style.aspectRatio = aspectRatio;
+                videoContainer.style.width = `${width}px`; // Ajustar al ancho exacto del stream
+                videoContainer.style.aspectRatio = aspectRatio; // Mantener la relación de aspecto
             }
 
             // Notificar al servidor que el stream ha comenzado
@@ -1296,7 +1298,7 @@
                     case 'stream_ended':
                         isStreaming = false;
                         console.log("Stream finalizado. Estado isStreaming:", isStreaming);
-                        showPlaceholder("La transmisión ha finalizado.");
+                        showPlaceholder("La transmisión ha finalizada.");
                         if (userRole === 'streamer') {
                             startButton.disabled = false;
                             startButton.textContent = "INICIAR TRANSMISIÓN";
@@ -1381,13 +1383,15 @@
                 liveStreamVideo.muted = true;
                 liveStreamVideo.playsInline = true;
 
-                // Ajustar dinámicamente la relación de aspecto
+                // Ajustar el ancho y la relación de aspecto del contenedor para el espectador
                 const videoTrack = remoteStream.getVideoTracks()[0];
                 if (videoTrack) {
                     const settings = videoTrack.getSettings();
+                    const width = settings.width;
                     const aspectRatio = settings.width / settings.height;
                     console.log(`Resolución del stream recibido: ${settings.width}x${settings.height}, Aspect Ratio: ${aspectRatio}`);
-                    videoContainer.style.aspectRatio = aspectRatio;
+                    videoContainer.style.width = `${width}px`; // Ajustar al ancho exacto del stream
+                    videoContainer.style.aspectRatio = aspectRatio; // Mantener la relación de aspecto
                 }
 
                 console.log("Intentando reproducir el video...");
