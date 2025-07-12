@@ -1,172 +1,489 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Apuestas Web</title>
+    <title>Ruleta Americana - WebRTC P2P</title>
     <style>
-        body { font-family: sans-serif; }
-        ul#messages { list-style-type: none; padding-left: 0; }
-        #video-container { position: relative; background-color: #000; width: 640px; height: 360px; margin-bottom: 10px; }
-		#reconnect-button { display: inline-block; padding: 10px 20px; font-size: 16px; font-weight: bold; color: white; background-color: #007bff; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
-		#reconnect-button:hover { background-color: #0056b3; }
+        body { font-family: sans-serif; padding: 20px; }
+        #main-container, #capture-controls { display: none; }
+        #login-container { text-align: center; margin-top: 50px; }
+        .video-container { width: 100%; max-width: 600px; background-color: #000; border: 1px solid #ccc; position: relative; }
+        #live-stream { width: 100%; display: block; }
+        .video-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #888; font-size: 1.5em; text-align: center; }
+        #welcome-container {
+            display: none;
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #enter-game-button {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        #enter-game-button:hover {
+            background-color: #0056b3;
+        }
+        #tutorial-video {
+            width: 50%;
+            height: auto;
+        }
     </style>
-	<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
-<h1>Ruleta Americana</h1>
-<div id="video-container"><video id="video" autoplay muted width="640" height="360"></video></div>
-<button id="reconnect-button">ACTUALIZAR VIDEO</button>
-
-<br>
-<p id="fecha_hora">Fecha y Hora: Esperando...</p>
-<p id="juego_numero">Juego Número: Esperando...</p>
-<p id="usuarios">Usuarios conectados: 0</p>
-
-<h1>Realiza tu apuesta</h1>
-<form onsubmit="sendMessage(event)">
-    <input type="text" id="nombre" placeholder="Tu nombre" autocomplete="off" required/>
-    <input type="number" id="apuesta" placeholder="Número de apuesta" autocomplete="off" min="0" max="36" required/>
-    <button>Enviar</button>
-</form>
-
-<ul id="messages"></ul>
+    <div id="login-container">
+        <h1>Bienvenido a la Ruleta Americana</h1>
+        <p>Por favor, ingresa tu nombre para continuar.</p>
+        <form id="login-form"><input type="text" id="name-input" placeholder="Tu nombre" required><button type="submit">Ingresar</button></form>
+    </div>
+    <div id="welcome-container">
+        <h1 id="welcome-message"></h1>
+        <p>¡Todo listo para empezar!</p>
+        <video id="tutorial-video" src="/static/color_wheel.mp4" controls></video>
+        <button id="enter-game-button">ENTRAR AL JUEGO</button>
+    </div>
+    <div id="main-container">
+        <h1>Ruleta Americana (Stream en Vivo - WebRTC)</h1>
+        <div class="video-container">
+            <video id="live-stream" autoplay muted playsinline></video>
+            <div id="streamPlaceholder" class="video-placeholder">Esperando transmisión...</div>
+        </div>
+        <div id="capture-controls">
+            <button id="startButton">INICIAR TRANSMISIÓN</button>
+        </div>
+    </div>
 
 <script>
-    // --- LÓGICA DEL VIDEO HLS (CORREGIDA) ---
-    const video = document.getElementById('video');
-    const reconnectButton = document.getElementById('reconnect-button');
-    
-    // --- URLs CONFIGURABLES ---
-    // Usa 'localhost' para pruebas en PC. Usa tu IP para pruebas en celular.
-    //const ipAddress = "localhost"; // Cambia "localhost" por tu IP (ej: "192.168.1.3") para pruebas remotas
-	//const ipAddress = "192.168.1.3";
-    // --------------------------
+    // --- Referencias al DOM ---
+    const loginContainer = document.getElementById('login-container');
+    const mainContainer = document.getElementById('main-container');
+    const loginForm = document.getElementById('login-form');
+    const nameInput = document.getElementById('name-input');
+    const startButton = document.getElementById('startButton');
+    const captureControls = document.getElementById('capture-controls');
+    const liveStreamVideo = document.getElementById('live-stream');
+    const streamPlaceholder = document.getElementById('streamPlaceholder');
+    const welcomeContainer = document.getElementById('welcome-container');
+    const welcomeMessage = document.getElementById('welcome-message');
+    const enterGameButton = document.getElementById('enter-game-button');
 
-    //const videoSrc = 'http://192.168.1.3:8081/hls/mystream.m3u8';
-	//const videoSrc = 'http://192.168.1.3:8081/hls/mystream.m3u8';
-	//const videoSrc = 'https://nasalive.akamaized.net/hls/live/2016355/nasa-channel-1-hd/master.m3u8'
-	var videoSrc = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
-	
-    let hls;
+    // --- Estado Global y Configuración ---
+    let ws = null;
+    let userRole = "viewer";
+    let isStreaming = false;
+    let localStream;
+    let peerConnections = {};
+    let peerConnection;
+    let currentUsername = '';
+    let streamerId = ''; // Almacenar el ID real del streamer
+    const pendingCandidates = {};
 
-    function setupHlsPlayer() {
-        if (hls) { hls.destroy(); }
-        
-        // CORRECCIÓN: Usar comas (,) para separar las propiedades del objeto.
-        hls = new Hls({
-            liveSyncDurationCount: 1,
-            liveMaxLatency: 1,
-            maxBufferLength: 1,
-            manifestLoadingMaxRetry: 5,
-            manifestLoadingRetryDelay: 1000,
-            fragLoadingMaxRetry: 6,
-            fragLoadingRetryDelay: 1000
-        });
-
-        hls.loadSource(videoSrc);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            console.log('Stream conectado.');
-            video.play().catch(e => console.log('Autoplay bloqueado:', e));
-        });
-
-        hls.on(Hls.Events.ERROR, (e, d) => {
-            console.error('Error de HLS:', d.details);
-            if (d.fatal) {
-                switch (d.type) {
-                    case Hls.ErrorTypes.NETWORK_ERROR: hls.startLoad(); break;
-                    case Hls.ErrorTypes.MEDIA_ERROR: hls.recoverMediaError(); break;
-                }
+    const configuration = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            {
+                urls: 'turn:relay1.expressturn.com:3480',
+                username: '000000002067441357',
+                credential: 'ZWtqCZGCwebs2UeE8c8ryeqBHN8='
             }
-        });
-    }
+        ]
+    };
 
-    video.addEventListener('contextmenu', e => e.preventDefault());
-    reconnectButton.addEventListener('click', () => setupHlsPlayer());
+    // --- INICIO DEL FLUJO DE LA APLICACIÓN ---
+    loginForm.onsubmit = (event) => {
+        event.preventDefault();
+        const username = nameInput.value.trim();
+        if (username) {
+            if (!ws || ws.readyState === WebSocket.CLOSED) {
+                currentUsername = username;
+                connectWebSocket(username);
+            } else {
+                console.log("Ya se está intentando una conexión.");
+            }
+        } else {
+            alert("Por favor, ingresa un nombre.");
+        }
+    };
 
-    if (Hls.isSupported()) { setupHlsPlayer(); } 
-    else if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = videoSrc; } 
-    else { alert('Tu navegador no soporta HLS.'); }
-    
-    // --- LÓGICA DEL WEBSOCKET (CON TU LÓGICA DE MENSAJES RESTAURADA) ---
-    const fechaHoraElem = document.getElementById('fecha_hora');
-    const juegoNumeroElem = document.getElementById('juego_numero');
-    const usuariosElem = document.getElementById('usuarios');
-    const messagesElem = document.getElementById('messages');
-    
-    //const wsUrl = 'ws://192.168.1.3:8080/ws/users';
-	const wsUrl = 'wss://fastapi-ruleta-americana.onrender.com/ws/users';
-    let ws;
-    const reconnectInterval = 3000;
+    enterGameButton.onclick = () => {
+        console.log("Usuario ha entrado al juego. Mostrando contenedor principal.");
+        welcomeContainer.style.display = 'none';
+        mainContainer.style.display = 'block';
 
-    function connectWebSocket() {
-        console.log(`Intentando conectar al WebSocket en ${wsUrl}...`);
-        ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => console.log("Conexión WebSocket establecida.");
-
-        ws.onmessage = function(event) {
+        if (userRole === 'streamer') {
+            captureControls.style.display = 'block';
+        }
+        
+        if (userRole === 'viewer' && isStreaming) {
+            console.log("Stream ya está activo. Iniciando visualización...");
+            startViewing();
+        }
+    };
+	
+	
+    startButton.onclick = async () => {
+        if (userRole === 'streamer' && !isStreaming) {
             try {
-                // Intenta interpretar como JSON para datos de estado (fecha, juego)
+                //localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+				//localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+				
+				localStream = await navigator.mediaDevices.getUserMedia({
+					video: {
+						deviceId: undefined // Let the user select the OBS Virtual Camera
+					},
+					audio: true // Capture audio if needed (e.g., game sound or microphone)
+				});
+                console.log("Stream capturado:", localStream.getVideoTracks(), localStream.getAudioTracks());
+                isStreaming = true;
+                startButton.disabled = true;
+                startButton.textContent = "TRANSMITIENDO...";
+                liveStreamVideo.srcObject = localStream;
+                liveStreamVideo.muted = true;
+                showStream();
+
+                // Notificar al servidor que el stream ha comenzado
+                ws.send(JSON.stringify({ type: 'start_stream', from_id: currentUsername }));
+
+                // Listener para cuando el streamer detiene la compartición
+                localStream.getVideoTracks()[0].onended = () => {
+                    console.log("Stream detenido por el usuario");
+                    ws.send(JSON.stringify({ type: 'stream_ended', from_id: currentUsername }));
+                    isStreaming = false;
+                    startButton.disabled = false;
+                    startButton.textContent = "INICIAR TRANSMISIÓN";
+                    localStream.getTracks().forEach(track => track.stop());
+                    localStream = null;
+                    Object.values(peerConnections).forEach(pc => pc.close());
+                    peerConnections = {};
+                };
+            } catch (err) {
+                console.error("Error al capturar pantalla o configurar stream:", err);
+				alert("No se pudo capturar la ventana seleccionada. Por favor, elige otra ventana o toda la pantalla.");
+                isStreaming = false;
+                startButton.disabled = false;
+                startButton.textContent = "INICIAR TRANSMISIÓN";
+            }
+        }
+    };
+	
+	
+    // --- LÓGICA DE WEBSOCKET ---
+    function connectWebSocket(username) {
+        console.log("Intentando conectar WebSocket...");
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.host;
+        ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/users`);
+
+        let heartbeatInterval;
+
+        ws.onopen = () => {
+            console.log("Conectado al servidor. WebSocket está OPEN.");
+            ws.send(JSON.stringify({ type: "login", name: username }));
+
+            heartbeatInterval = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 25000);
+        };
+
+        ws.onmessage = async (event) => {
+            try {
                 const data = JSON.parse(event.data);
-                if (data.type === 'juego_numero') {
-                    juegoNumeroElem.textContent = 'Juego Número: ' + data.payload;
-                } else if (data.type === 'fecha_hora') {
-                    fechaHoraElem.textContent = 'Fecha y Hora: ' + data.payload;
+                if (data.type === 'pong') return;
+                console.log("Mensaje recibido:", data);
+
+                switch (data.type) {
+                    case 'login_success':
+                        userRole = data.role;
+                        streamerId = data.streamer_id || ''; // Obtener el ID del streamer
+                        console.log(`Rol asignado: ${userRole}, Streamer ID: ${streamerId}`);
+                        loginContainer.style.display = 'none';
+                        welcomeContainer.style.display = 'block';
+                        welcomeMessage.textContent = `¡Bienvenido, ${currentUsername}!`;
+                        break;
+
+                    case 'stream_started':
+                        isStreaming = true;
+                        console.log("Stream iniciado. Estado isStreaming:", isStreaming);
+                        if (mainContainer.style.display === 'block' && userRole === 'viewer') {
+                            showStream();
+                            startViewing();
+                        }
+                        break;
+                    
+                    case 'stream_ended':
+                        isStreaming = false;
+                        console.log("Stream finalizado. Estado isStreaming:", isStreaming);
+                        showPlaceholder("La transmisión ha finalizado.");
+                        if (userRole === 'streamer') {
+                            startButton.disabled = false;
+                            startButton.textContent = "INICIAR TRANSMISIÓN";
+                            if (localStream) localStream.getTracks().forEach(track => track.stop());
+                            localStream = null;
+                            Object.values(peerConnections).forEach(pc => pc.close());
+                            peerConnections = {};
+                        } else {
+                            if (peerConnection) peerConnection.close();
+                            peerConnection = null;
+                            liveStreamVideo.srcObject = null;
+                        }
+                        break;
+
+                    case 'offer':
+                        if (userRole === 'streamer') {
+                            console.log(`Oferta recibida de ${data.from_id}`);
+                            await handleOffer(data.offer, data.from_id);
+                        }
+                        break;
+                    case 'answer':
+                        if (userRole === 'viewer') {
+                            console.log(`Respuesta recibida de streamer`);
+                            await handleAnswer(data.answer, data.from_id);
+                        }
+                        break;
+                    case 'candidate':
+                        console.log(`Candidato ICE recibido de ${data.from_id} para ${data.target_id}`);
+                        await handleCandidate(data.candidate, data.from_id);
+                        break;
                 }
             } catch (e) {
-                // Si no es JSON, usa tu lógica original para mensajes de texto
-                const messageText = event.data;
-                
-                if (messageText.startsWith("Usuarios conectados:")) {
-                    usuariosElem.textContent = messageText;
-                } else if (messageText.indexOf("INICIO del juego") !== -1) {
-                    const hr = document.createElement('hr');
-                    messagesElem.appendChild(hr); // <hr> ANTES del mensaje
-                    const li = document.createElement('li');
-                    li.textContent = messageText;
-                    messagesElem.appendChild(li);
-                } else if (messageText.indexOf("FIN del juego") !== -1) {
-                    const li = document.createElement('li');
-                    li.textContent = messageText;
-                    messagesElem.appendChild(li);
-                } else {
-                    // Para cualquier otro mensaje de texto (apuestas, ganadores, etc.)
-                    const li = document.createElement('li');
-                    li.textContent = messageText;
-                    messagesElem.appendChild(li);
-                }
+                console.log("Mensaje de texto plano recibido:", event.data);
             }
         };
 
-        ws.onclose = () => {
-            console.log(`Conexión WebSocket cerrada. Reconectando en ${reconnectInterval / 1000}s...`);
-            setTimeout(connectWebSocket, reconnectInterval);
+        ws.onclose = (event) => {
+            console.log("Conexión cerrada.", event.code, event.reason);
+            clearInterval(heartbeatInterval);
+            ws = null;
+            loginContainer.style.display = 'block';
+            mainContainer.style.display = 'none';
+            welcomeContainer.style.display = 'none';
+            alert("Se ha perdido la conexión con el servidor. Por favor, ingresa de nuevo.");
         };
 
         ws.onerror = (error) => {
             console.error("Error en WebSocket:", error);
-            ws.close();
         };
     }
-    
-    function sendMessage(event) {
-        event.preventDefault();
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            alert("No estás conectado. Espera a que se restablezca la conexión.");
+
+    // --- LÓGICA DE WEBRTC ---
+    async function startViewing() {
+        if (!streamerId) {
+            console.error("No se ha recibido el ID del streamer. No se puede iniciar la visualización.");
+            showPlaceholder("No hay streamer disponible.");
             return;
         }
-        const nombreInput = document.getElementById('nombre');
-        const apuestaInput = document.getElementById('apuesta');
-        ws.send(JSON.stringify({
-            nombre: nombreInput.value.trim(),
-            apuesta: apuestaInput.value.trim()
-        }));
-        apuestaInput.value = '';
+        console.log("Iniciando conexión WebRTC como espectador...");
+        peerConnection = new RTCPeerConnection(configuration);
+
+        pendingCandidates['viewer'] = [];
+
+        peerConnection.ontrack = (event) => {
+            console.log("-> EVENTO ONTRACK DISPARADO");
+            const remoteStream = event.streams[0];
+            console.log("Pistas de video:", remoteStream.getVideoTracks());
+            console.log("Pistas de audio:", remoteStream.getAudioTracks());
+
+            if (liveStreamVideo.srcObject !== remoteStream) {
+                console.log("Asignando nuevo stream al elemento de video.");
+                liveStreamVideo.srcObject = remoteStream;
+            }
+
+            liveStreamVideo.muted = true;
+            liveStreamVideo.playsInline = true;
+
+            console.log("Intentando reproducir el video...");
+            const playPromise = liveStreamVideo.play();
+
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log("¡La reproducción del video se inició con éxito!");
+                    showStream();
+                }).catch(error => {
+                    console.error("La reproducción automática fue bloqueada:", error);
+                    showPlaceholder("Transmisión lista. Haz clic aquí para reproducir.");
+
+                    const playOnClick = () => {
+                        console.log("Intentando reproducir por clic del usuario...");
+                        liveStreamVideo.play().then(() => {
+                            console.log("¡Reproducción iniciada por el usuario!");
+                            showStream();
+                            liveStreamVideo.removeEventListener('click', playOnClick);
+                        }).catch(err => {
+                            console.error("La reproducción por clic también falló:", err);
+                        });
+                    };
+                    liveStreamVideo.addEventListener('click', playOnClick);
+                });
+            }
+        };
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                console.log('Enviando candidato ICE:', event.candidate);
+                ws.send(JSON.stringify({ 
+                    type: 'candidate', 
+                    candidate: event.candidate,
+                    target_id: streamerId,
+                    from_id: currentUsername
+                }));
+            }
+        };
+
+        peerConnection.onconnectionstatechange = () => {
+            console.log("Estado de conexión WebRTC:", peerConnection.connectionState);
+        };
+
+        try {
+            peerConnection.addTransceiver('video', {'direction': 'recvonly'});
+            peerConnection.addTransceiver('audio', {'direction': 'recvonly'});
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            console.log("Oferta enviada:", peerConnection.localDescription);
+            ws.send(JSON.stringify({ 
+                type: 'offer', 
+                offer: peerConnection.localDescription, 
+                from_id: currentUsername, 
+                target_id: streamerId 
+            }));
+            if (pendingCandidates['viewer'].length > 0) {
+                console.log("Procesando candidatos pendientes para viewer...");
+                for (const candidate of pendingCandidates['viewer']) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                    console.log("Candidato ICE añadido para viewer");
+                }
+                pendingCandidates['viewer'] = [];
+            }
+        } catch (error) {
+            console.error("Error al crear o enviar la oferta:", error);
+        }
     }
 
-    // Iniciar la conexión WebSocket al cargar la página
-    connectWebSocket();
+    async function handleOffer(offer, viewerId) {
+        console.log(`Manejando oferta de ${viewerId}`);
+        const pc = new RTCPeerConnection(configuration);
+        peerConnections[viewerId] = pc;
+
+        pendingCandidates[viewerId] = [];
+
+        pc.onicecandidate = event => {
+            if (event.candidate) {
+                console.log(`Enviando candidato ICE para ${viewerId}:`, event.candidate);
+                ws.send(JSON.stringify({ 
+                    type: 'candidate', 
+                    candidate: event.candidate,
+                    target_id: viewerId,
+                    from_id: currentUsername
+                }));
+            }
+        };
+
+        pc.onconnectionstatechange = () => {
+            console.log(`Estado de conexión WebRTC para ${viewerId}:`, pc.connectionState);
+        };
+
+        try {
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
+            console.log(`remoteDescription configurada para ${viewerId}`);
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    pc.addTrack(track, localStream);
+                    console.log(`Pista añadida para ${viewerId}: ${track.kind} (id: ${track.id})`);
+                });
+            } else {
+                console.warn(`No hay localStream disponible para ${viewerId}`);
+            }
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            console.log(`Respuesta enviada para ${viewerId}:`, answer);
+            ws.send(JSON.stringify({ 
+                type: 'answer', 
+                answer: answer,
+                target_id: viewerId,
+                from_id: currentUsername
+            }));
+            if (pendingCandidates[viewerId].length > 0) {
+                console.log(`Procesando candidatos pendientes para ${viewerId}...`);
+                for (const candidate of pendingCandidates[viewerId]) {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    console.log(`Candidato ICE añadido para ${viewerId}`);
+                }
+                pendingCandidates[viewerId] = [];
+            }
+        } catch (error) {
+            console.error(`Error manejando oferta de ${viewerId}:`, error);
+        }
+    }
+
+    async function handleAnswer(answer, fromId) {
+        const pc = peerConnection; // Viewer usa una sola peerConnection
+        if (pc) {
+            try {
+                await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                console.log(`remoteDescription configurada para respuesta de ${fromId}`);
+                if (pendingCandidates['viewer'].length > 0) {
+                    console.log(`Procesando candidatos pendientes para viewer...`);
+                    for (const candidate of pendingCandidates['viewer']) {
+                        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                        console.log(`Candidato ICE añadido para viewer`);
+                    }
+                    pendingCandidates['viewer'] = [];
+                }
+            } catch (error) {
+                console.error(`Error manejando respuesta de ${fromId}:`, error);
+            }
+        } else {
+            console.warn(`No se encontró peerConnection para el viewer`);
+        }
+    }
+
+    async function handleCandidate(candidate, fromId) {
+        const pc = (userRole === 'streamer') ? peerConnections[fromId] : peerConnection;
+        if (pc) {
+            try {
+                if (pc.remoteDescription && pc.remoteDescription.type) {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    console.log(`Candidato ICE añadido para ${fromId}`);
+                } else {
+                    console.log(`remoteDescription no está lista para ${fromId}. Almacenando candidato...`);
+                    if (!pendingCandidates[fromId] && userRole === 'streamer') {
+                        pendingCandidates[fromId] = [];
+                    } else if (!pendingCandidates['viewer'] && userRole === 'viewer') {
+                        pendingCandidates['viewer'] = [];
+                    }
+                    (userRole === 'streamer' ? pendingCandidates[fromId] : pendingCandidates['viewer']).push(candidate);
+                }
+            } catch (e) {
+                console.error(`Error añadiendo candidato ICE para ${fromId}:`, e);
+            }
+        } else {
+            console.warn(`No se encontró peerConnection para ${fromId}`);
+        }
+    }
+
+    // --- Funciones de UI ---
+    function showStream() {
+        liveStreamVideo.style.visibility = 'visible';
+        streamPlaceholder.style.display = 'none';
+    }
+
+    function showPlaceholder(message) {
+        liveStreamVideo.style.visibility = 'hidden';
+        streamPlaceholder.textContent = message;
+        streamPlaceholder.style.display = 'block';
+    }
 </script>
 </body>
 </html>
