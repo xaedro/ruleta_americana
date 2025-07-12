@@ -1153,7 +1153,7 @@
     };
 
     startButton.onclick = async () => {
-        if (userRole === 'streamer' && !isStreaming) {
+        //if (userRole === 'streamer' && !isStreaming) {
             try {
                 localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
                 console.log("Stream capturado:", localStream.getVideoTracks(), localStream.getAudioTracks());
@@ -1185,7 +1185,7 @@
                 startButton.disabled = false;
                 startButton.textContent = "INICIAR TRANSMISIÓN";
             }
-        }
+        //}
     };
 
     // --- LÓGICA DE WEBSOCKET ---
