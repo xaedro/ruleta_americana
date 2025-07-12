@@ -612,8 +612,8 @@
     startButton.onclick = async () => {
         if (userRole === 'streamer' && !isStreaming) {
             try {
-                //localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-				localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+				//localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 				/*
 				localStream = await navigator.mediaDevices.getUserMedia({
 					video: {

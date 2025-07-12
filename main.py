@@ -274,7 +274,7 @@ async def get_old_version():
 
 @app.get("/")
 async def get_new_version():
-    return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"))
+    return FileResponse(os.path.join(os.path.dirname(__file__), "index4.html"))
 
 @app.post("/stream_ended")
 async def notify_stream_ended(x_secret_key: Optional[str] = Header(None)):

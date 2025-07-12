@@ -491,27 +491,6 @@
 -->
 
 <!-- index.html -->
-¡Gracias por las aclaraciones! Entiendo tus puntos:
-1. **Eliminar la verificación `if (userRole !== 'streamer')`**: Tienes razón, si solo el streamer ve el botón "INICIAR TRANSMISIÓN" (controlado por `captureControls.style.display = 'block'` cuando `userRole === 'streamer'`), esta verificación es redundante y puede eliminarse.
-2. **Eliminar restricciones de resolución (`width`, `height`)**: No solicitaste estas restricciones (`width: { ideal: 1280 }, height: { ideal: 720 }`) en `getUserMedia`, y podrían estar interfiriendo con el diálogo de selección de fuente. Las quitaré para usar solo `deviceId: { exact: undefined }` y `audio: true`.
-3. **Problema con los alerts impidiendo el diálogo de `getUserMedia`**: Es posible que el `alert` antes de `getUserMedia` esté bloqueando el flujo, ya que algunos navegadores (como Firefox 78 ESR o Chrome 80 en Windows 7) no muestran el diálogo de selección de fuente si hay un `alert` activo, debido a restricciones de seguridad o interacción con la UI. Reemplazaré el `alert` por un `console.log` o un mensaje en la UI para evitar este problema.
-
-Voy a actualizar el código de `index.html`, manteniendo tus nombres de variables (`peerConnections`, `localStream`, `userRole`, etc.) y la estructura original, aplicando los siguientes cambios en `startButton.onclick`:
-- Eliminar `if (userRole !== 'streamer')`.
-- Usar `getUserMedia` sin restricciones de resolución, solo con `video: { deviceId: { exact: undefined } }, audio: true` para forzar el diálogo de selección de fuente (mostrando “OBS-Camera”).
-- Reemplazar el `alert` antes de `getUserMedia` por un mensaje en la UI (usando `showPlaceholder`) para evitar bloquear el diálogo.
-- Mantener la deshabilitación del botón por 5 segundos y cambiar el texto a "CAMBIAR FUENTE".
-- Liberar el stream anterior (`localStream`) y conexiones WebRTC (`peerConnections`) para forzar el diálogo.
-- Asegurar que “mario” no sea registrado como viewer, manteniendo compatibilidad con `main.py`.
-
-El resto del código (WebSocket, WebRTC, UI) permanecerá intacto, ya que es funcional. También verificaré la compatibilidad con tu configuración en Windows 7, OBS 27.2.4 con `obs-virtual-cam`, y `launch_blender_with_capture.exe`.
-
----
-
-## Código actualizado para `index.html`
-
-```html
-```html
 <!DOCTYPE html>
 <html>
 <head>
