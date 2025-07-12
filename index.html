@@ -1012,20 +1012,25 @@
 <head>
     <title>Ruleta Americana - WebRTC P2P</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; }
+        body { 
+            font-family: sans-serif; 
+            margin: 0; /* Eliminar márgenes para consistencia */
+            padding: 0; /* Eliminar padding para consistencia */
+        }
         #main-container, #capture-controls { display: none; }
         #login-container { text-align: center; margin-top: 50px; }
         .video-container {
             width: 50%; /* Ancho inicial del 50% */
             background-color: #000;
-            border: 1px solid #ccc;
             position: relative;
+            box-sizing: border-box; /* Asegura que el tamaño incluya bordes y padding */
         }
         #live-stream {
             width: 100%;
             height: 100%;
             display: block;
             object-fit: contain; /* Preserva la relación de aspecto sin recorte */
+            image-rendering: pixelated; /* Evita escalado suave del navegador */
         }
         .video-placeholder {
             position: absolute;
@@ -1203,8 +1208,9 @@
             if (videoTrack) {
                 const settings = videoTrack.getSettings();
                 const width = settings.width;
-                const aspectRatio = settings.width / settings.height;
-                console.log(`Resolución del stream capturado: ${settings.width}x${settings.height}, Aspect Ratio: ${aspectRatio}`);
+                const height = settings.height;
+                const aspectRatio = width / height;
+                console.log(`[Streamer] Resolución capturada: ${width}x${height}, Aspect Ratio: ${aspectRatio}`);
                 videoContainer.style.width = `${width}px`; // Ajustar al ancho exacto del stream
                 videoContainer.style.aspectRatio = aspectRatio; // Mantener la relación de aspecto
             }
@@ -1298,7 +1304,7 @@
                     case 'stream_ended':
                         isStreaming = false;
                         console.log("Stream finalizado. Estado isStreaming:", isStreaming);
-                        showPlaceholder("La transmisión ha finalizada.");
+                        showPlaceholder("La transmisión ha finalizado.");
                         if (userRole === 'streamer') {
                             startButton.disabled = false;
                             startButton.textContent = "INICIAR TRANSMISIÓN";
@@ -1388,8 +1394,9 @@
                 if (videoTrack) {
                     const settings = videoTrack.getSettings();
                     const width = settings.width;
-                    const aspectRatio = settings.width / settings.height;
-                    console.log(`Resolución del stream recibido: ${settings.width}x${settings.height}, Aspect Ratio: ${aspectRatio}`);
+                    const height = settings.height;
+                    const aspectRatio = width / height;
+                    console.log(`[Viewer] Resolución recibida: ${width}x${height}, Aspect Ratio: ${aspectRatio}`);
                     videoContainer.style.width = `${width}px`; // Ajustar al ancho exacto del stream
                     videoContainer.style.aspectRatio = aspectRatio; // Mantener la relación de aspecto
                 }
