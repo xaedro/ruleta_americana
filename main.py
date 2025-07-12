@@ -186,6 +186,7 @@ import uuid
 
 from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -193,7 +194,21 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
+# --- AÑADE ESTE MIDDLEWARE ---
+# Este middleware agregará el encabezado Permissions-Policy a cada respuesta.
+class PermissionsPolicyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Llama a la siguiente parte de la cadena (tu ruta)
+        response = await call_next(request)
+        # Añade el encabezado antes de devolver la respuesta
+        response.headers['Permissions-Policy'] = 'display-capture=(self)'
+        return response
+
+
+# -----------------------------
+
 # --- MIDDLEWARE DE CORS ---
+"""
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -201,6 +216,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+"""
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://fastapi-ruleta-americana.onrender.com"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Añade el middleware a tu aplicación FastAPI
+app.add_middleware(PermissionsPolicyMiddleware)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
