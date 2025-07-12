@@ -1153,6 +1153,7 @@
     };
 
     startButton.onclick = async () => {
+		alert("ENTRA")
         //if (userRole === 'streamer' && !isStreaming) {
             try {
                 localStream = await navigator.mediaDevices.getDisplayMedia({ video: true});
