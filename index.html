@@ -491,6 +491,27 @@
 -->
 
 <!-- index.html -->
+¡Gracias por las aclaraciones! Entiendo tus puntos:
+1. **Eliminar la verificación `if (userRole !== 'streamer')`**: Tienes razón, si solo el streamer ve el botón "INICIAR TRANSMISIÓN" (controlado por `captureControls.style.display = 'block'` cuando `userRole === 'streamer'`), esta verificación es redundante y puede eliminarse.
+2. **Eliminar restricciones de resolución (`width`, `height`)**: No solicitaste estas restricciones (`width: { ideal: 1280 }, height: { ideal: 720 }`) en `getUserMedia`, y podrían estar interfiriendo con el diálogo de selección de fuente. Las quitaré para usar solo `deviceId: { exact: undefined }` y `audio: true`.
+3. **Problema con los alerts impidiendo el diálogo de `getUserMedia`**: Es posible que el `alert` antes de `getUserMedia` esté bloqueando el flujo, ya que algunos navegadores (como Firefox 78 ESR o Chrome 80 en Windows 7) no muestran el diálogo de selección de fuente si hay un `alert` activo, debido a restricciones de seguridad o interacción con la UI. Reemplazaré el `alert` por un `console.log` o un mensaje en la UI para evitar este problema.
+
+Voy a actualizar el código de `index.html`, manteniendo tus nombres de variables (`peerConnections`, `localStream`, `userRole`, etc.) y la estructura original, aplicando los siguientes cambios en `startButton.onclick`:
+- Eliminar `if (userRole !== 'streamer')`.
+- Usar `getUserMedia` sin restricciones de resolución, solo con `video: { deviceId: { exact: undefined } }, audio: true` para forzar el diálogo de selección de fuente (mostrando “OBS-Camera”).
+- Reemplazar el `alert` antes de `getUserMedia` por un mensaje en la UI (usando `showPlaceholder`) para evitar bloquear el diálogo.
+- Mantener la deshabilitación del botón por 5 segundos y cambiar el texto a "CAMBIAR FUENTE".
+- Liberar el stream anterior (`localStream`) y conexiones WebRTC (`peerConnections`) para forzar el diálogo.
+- Asegurar que “mario” no sea registrado como viewer, manteniendo compatibilidad con `main.py`.
+
+El resto del código (WebSocket, WebRTC, UI) permanecerá intacto, ya que es funcional. También verificaré la compatibilidad con tu configuración en Windows 7, OBS 27.2.4 con `obs-virtual-cam`, y `launch_blender_with_capture.exe`.
+
+---
+
+## Código actualizado para `index.html`
+
+```html
+```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -557,7 +578,7 @@
     </div>
 
 <script>
-    // --- Referencias al DOM ---
+    // Referencias al DOM
     const loginContainer = document.getElementById('login-container');
     const mainContainer = document.getElementById('main-container');
     const loginForm = document.getElementById('login-form');
@@ -570,7 +591,7 @@
     const welcomeMessage = document.getElementById('welcome-message');
     const enterGameButton = document.getElementById('enter-game-button');
 
-    // --- Estado Global y Configuración ---
+    // Estado Global y Configuración
     let ws = null;
     let userRole = "viewer";
     let isStreaming = false;
@@ -590,7 +611,7 @@
         ]
     };
 
-    // --- INICIO DEL FLUJO DE LA APLICACIÓN ---
+    // INICIO DEL FLUJO DE LA APLICACIÓN
     loginForm.onsubmit = (event) => {
         event.preventDefault();
         const username = nameInput.value.trim();
@@ -622,38 +643,33 @@
     };
 
     startButton.onclick = async () => {
-        if (userRole !== 'streamer') {
-            alert("Solo el streamer puede iniciar la transmisión.");
-            return;
-        }
-
-        // Disable the button temporarily to prevent rapid clicks
+        // Deshabilitar el botón temporalmente para evitar clics rápidos
         startButton.disabled = true;
         startButton.textContent = "CARGANDO...";
 
         try {
-            // Release any existing stream and peer connections to force the selection dialog
+            // Liberar el stream anterior y conexiones WebRTC para forzar el diálogo
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
-                console.log("Previous stream released to force device selection dialog.");
+                console.log("Stream anterior liberado para forzar el diálogo de selección.");
             }
             Object.values(peerConnections).forEach(pc => pc.close());
             peerConnections = {};
 
-            // Force the device selection dialog for OBS Virtual Camera
-            alert("Selecciona 'OBS-Camera' o 'OBS Virtual Camera' en el diálogo de selección de cámara.");
+            // Mostrar mensaje en la UI para guiar al usuario
+            showPlaceholder("Selecciona 'OBS-Camera' o 'OBS Virtual Camera' en el diálogo.");
+
+            // Forzar el diálogo de selección de cámara virtual de OBS
             localStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    deviceId: { exact: undefined }
-                },
-                audio: true // Capture audio if needed (e.g., game sound or microphone)
+                video: { deviceId: { exact: undefined } },
+                audio: true // Capturar audio si es necesario (ej. sonido del juego o micrófono)
             });
             console.log("Pistas capturadas:", localStream.getVideoTracks(), localStream.getAudioTracks());
 
+            // Verificar si se capturó video
             if (localStream.getVideoTracks().length === 0) {
+                showPlaceholder("No se detectó video. Asegúrate de que OBS esté abierto y la cámara virtual activada.");
                 alert("No se detectó video. Asegúrate de que OBS esté abierto, la cámara virtual esté activada (Tools > VirtualCam > Start), y selecciona 'OBS-Camera'.");
                 isStreaming = false;
                 startButton.disabled = false;
@@ -661,16 +677,16 @@
                 return;
             }
 
-            // Assign stream to video element for streamer preview
+            // Asignar el stream al elemento de video para vista previa del streamer
             liveStreamVideo.srcObject = localStream;
             liveStreamVideo.muted = true;
             showStream();
             isStreaming = true;
 
-            // Notify server that streaming has started
+            // Notificar al servidor que el stream ha comenzado
             ws.send(JSON.stringify({ type: 'start_stream', from_id: currentUsername }));
 
-            // Re-enable the button after 5 seconds
+            // Rehabilitar el botón después de 5 segundos
             setTimeout(() => {
                 if (isStreaming) {
                     startButton.disabled = false;
@@ -678,7 +694,7 @@
                 }
             }, 5000);
 
-            // Listener for when the streamer stops sharing
+            // Listener para cuando el streamer detiene la compartición
             localStream.getVideoTracks()[0].onended = () => {
                 console.log("Stream detenido por el usuario");
                 ws.send(JSON.stringify({ type: 'stream_ended', from_id: currentUsername }));
@@ -693,14 +709,15 @@
             };
         } catch (err) {
             console.error("Error al capturar la cámara virtual de OBS:", err);
-            alert("Error al capturar la cámara virtual. Asegúrate de que OBS esté abierto, la cámara virtual esté activada, y selecciona 'OBS-Camera' en el diálogo.");
+            showPlaceholder("Error al capturar la cámara virtual. Verifica OBS y selecciona 'OBS-Camera'.");
+            alert("Error al capturar la cámara virtual. Asegúrate de que OBS esté abierto, la cámara virtual esté activada, y selecciona 'OBS-Camera'.");
             isStreaming = false;
             startButton.disabled = false;
             startButton.textContent = "INICIAR TRANSMISIÓN";
         }
     };
 
-    // --- LÓGICA DE WEBSOCKET ---
+    // LÓGICA DE WEBSOCKET
     function connectWebSocket(username) {
         console.log("Intentando conectar WebSocket...");
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -800,7 +817,7 @@
         };
     }
 
-    // --- LÓGICA DE WEBRTC ---
+    // LÓGICA DE WEBRTC
     async function startViewing() {
         if (!streamerId) {
             console.error("No se ha recibido el ID del streamer. No se puede iniciar la visualización.");
@@ -995,7 +1012,7 @@
         }
     }
 
-    // --- Funciones de UI ---
+    // Funciones de UI
     function showStream() {
         liveStreamVideo.style.visibility = 'visible';
         streamPlaceholder.style.display = 'none';
