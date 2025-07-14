@@ -717,13 +717,6 @@ async def get_old_version():
 async def get_new_version():
     return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"))
 
-"""
-@app.post("/consecutivo_juego/")
-async def recibir_consecutivo(data: ConsecutiveData):
-    payload = {"type": "juego_numero", "payload": data.consecutive_id}
-    await manager.broadcast_json(payload)
-    return {"status": "ok"}
-"""
 @app.post("/consecutivo_juego/")
 async def recibir_consecutivo(data: ConsecutiveData):
     # Almacenar el consecutive_id en el ConnectionManager
