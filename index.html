@@ -2460,7 +2460,8 @@
     const pendingCandidates = {};
     let intervalId = null;
     let currentDateTime = null;
-        
+    
+	/*
     const configuration = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -2473,7 +2474,19 @@
             }
         ]
     };
-    
+    */
+	
+	const configuration = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            {
+                urls: 'turn:relay1.expressturn.com:3480',
+                username: '000000002067654307',
+                credential: '1jzG+9wsEaf0vTCLYDavBWY/TC4='
+            }
+        ]
+    };
+	
     // Función para actualizar la fecha y hora cada segundo
     function startDateTimeUpdate(fechaHoraStr) {
         if (intervalId) {
