@@ -1261,7 +1261,7 @@
         const maxRetries = 5;
 
         ws.onopen = () => {
-            console.log("Conectado al servidor. WebSocket está OPEN.");
+            console.log("Conectado al servidor. WebSocket está en estado OPEN.");
             ws.send(JSON.stringify({ type: "login", name: username }));
             retryCount = 0;
 

@@ -504,7 +504,8 @@ async def recibir_consecutivo(data: ConsecutiveData):
 @app.post("/fecha_hora/")
 async def recibir_fecha_hora(data: DateTimeData):
     payload = {"type": "fecha_hora", "payload": data.fecha_hora_str}
-    await manager.broadcast_to_users(json.dumps(payload))
+    #await manager.broadcast_to_users(json.dumps(payload))
+    await manager.broadcast_json(payload)
     return {"status": "ok"}
 
 @app.post("/stream_ended")
