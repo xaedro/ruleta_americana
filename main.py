@@ -660,6 +660,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
         self.streamer_id: Optional[str] = None
+		self.current_consecutive_id: Optional[int] = None  # Almacenar el consecutive_id actual
 
     async def connect(self, websocket: WebSocket) -> str:
         await websocket.accept()
@@ -715,8 +716,17 @@ async def get_old_version():
 async def get_new_version():
     return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"))
 
+"""
 @app.post("/consecutivo_juego/")
 async def recibir_consecutivo(data: ConsecutiveData):
+    payload = {"type": "juego_numero", "payload": data.consecutive_id}
+    await manager.broadcast_json(payload)
+    return {"status": "ok"}
+"""
+@app.post("/consecutivo_juego/")
+async def recibir_consecutivo(data: ConsecutiveData):
+    # Almacenar el consecutive_id en el ConnectionManager
+    manager.current_consecutive_id = data.consecutive_id
     payload = {"type": "juego_numero", "payload": data.consecutive_id}
     await manager.broadcast_json(payload)
     return {"status": "ok"}
