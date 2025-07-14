@@ -2039,6 +2039,9 @@
                         console.log(`Candidato ICE recibido de ${data.from_id} para ${data.target_id}`);
                         await handleCandidate(data.candidate, data.from_id);
                         break;
+                    case 'juego_numero':
+                        juegoNumeroElem.textContent = 'Juego Número: ' + data.payload;
+                        break;
                     case 'fecha_hora':
                         fechaHoraElem.textContent = 'Fecha y Hora: ' + data.payload;
                         startDateTimeUpdate(data.payload);
