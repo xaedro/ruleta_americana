@@ -495,6 +495,12 @@ async def get_old_version():
 async def get_new_version():
     return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"))
 
+@app.post("/fecha_hora/")
+async def recibir_fecha_hora(data: DateTimeData):
+    payload = {"type": "fecha_hora", "payload": data.fecha_hora_str}
+    await manager.broadcast_to_users(json.dumps(payload))
+    return {"status": "ok"}
+
 @app.post("/stream_ended")
 async def notify_stream_ended(x_secret_key: Optional[str] = Header(None)):
     if x_secret_key != SECRET_KEY:
