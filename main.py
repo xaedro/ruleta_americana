@@ -660,7 +660,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
         self.streamer_id: Optional[str] = None
-		self.current_consecutive_id: Optional[int] = None  # Almacenar el consecutive_id actual
+        self.current_consecutive_id: Optional[int] = None  # Almacenar el consecutive_id actual
 
     async def connect(self, websocket: WebSocket) -> str:
         await websocket.accept()
