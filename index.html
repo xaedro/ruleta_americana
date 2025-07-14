@@ -2672,6 +2672,7 @@
                         await handleCandidate(data.candidate, data.from_id);
                         break;
                     case 'fecha_hora':
+						console.log(`Recibido un cambio en fecha_hora ${data.payload}`);
                         fechaHoraElem.textContent = 'Fecha y Hora: ' + data.payload;
                         startDateTimeUpdate(data.payload);
                         break;
