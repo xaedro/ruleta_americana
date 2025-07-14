@@ -1103,11 +1103,9 @@
         <p id="usuarios">Usuarios conectados: 0</p>
         <h1>Realiza tu apuesta</h1>
         <form onsubmit="sendMessage(event)">
-            <!-- CAMBIO 1: Reemplazamos el input de texto por una etiqueta para el nombre -->
             <label>Jugador: <strong id="nombre-logueado"></strong></label>
             <br><br>
             <input type="number" id="apuesta" placeholder="Número de apuesta" autocomplete="off" min="0" max="36" required/>
-            <!-- CAMBIO 2: Añadimos un ID al botón y lo deshabilitamos por defecto -->
             <button id="btnEnviarApuesta" disabled>Enviar</button>
         </form>
         <ul id="messages"></ul>
