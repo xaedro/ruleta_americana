@@ -2668,11 +2668,21 @@
 							showStream();
 							startViewing();
 							// Aplicar dimensiones recibidas
-							if (data.video_dimensions) {
+							if (data.video_dimensions && data.video_dimensions.width && data.video_dimensions.height) {
 								const { width, height, aspectRatio } = data.video_dimensions;
 								console.log(`[Viewer] Dimensiones recibidas: ${width}x${height}, Aspect Ratio: ${aspectRatio}`);
-								videoContainer.style.width = `${width}px`;
-								videoContainer.style.aspectRatio = aspectRatio;
+								if (width > 0 && height > 0 && !isNaN(aspectRatio)) {
+									videoContainer.style.width = `${width}px`;
+									videoContainer.style.aspectRatio = aspectRatio;
+								} else {
+									console.warn("Dimensiones inválidas recibidas:", data.video_dimensions);
+									videoContainer.style.width = '640px'; // Valor por defecto
+									videoContainer.style.aspectRatio = '16/9'; // Valor por defecto
+								}
+							} else {
+								console.warn("No se recibieron dimensiones en stream_started.");
+								videoContainer.style.width = '640px'; // Valor por defecto
+								videoContainer.style.aspectRatio = '16/9'; // Valor por defecto
 							}
 						}
 						break;
