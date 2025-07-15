@@ -948,12 +948,14 @@ async def get_old_version():
 async def get_new_version():
     return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"))
 
+"""
 @app.get("/favicon.ico")
 async def get_favicon():
     favicon_path = os.path.join(os.path.dirname(__file__), "static", "favicon.ico")
     if os.path.exists(favicon_path):
         return FileResponse(favicon_path)
     raise HTTPException(status_code=404, detail="Favicon not found")
+"""
 
 @app.post("/consecutivo_juego/")
 async def recibir_consecutivo(data: ConsecutiveData):

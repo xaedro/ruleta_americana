@@ -2326,6 +2326,7 @@
 <html>
 <head>
     <title>Ruleta Americana - WebRTC P2P</title>
+	<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <style>
         body { 
             font-family: sans-serif; 
@@ -2469,7 +2470,7 @@
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
             {
-                urls: 'turn:relay1.expressturn.com:3480',
+                urls: 'turn:relay1.expressturn.com:3478',
                 username: '000000002067441357',
                 credential: 'ZWtqCZGCwebs2UeE8c8ryeqBHN8='
             }
@@ -2477,6 +2478,20 @@
     };
     */
 	
+	const configuration = {
+        iceServers: [
+		{
+			"urls": "stun:relay1.expressturn.com:3480"
+		},
+		{
+			"urls": "turn:relay1.expressturn.com:3480?transport=tcp",
+			"username": "000000002067654307",
+			"credential": "1jzG+9wsEaf0vTCLYDavBWY/TC4="
+		}
+		]
+	};
+	
+	/*
 	const configuration = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -2487,6 +2502,7 @@
             }
         ]
     };
+	*/
 	
     // Función para actualizar la fecha y hora cada segundo
     function startDateTimeUpdate(fechaHoraStr) {
