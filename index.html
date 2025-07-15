@@ -2844,7 +2844,7 @@
     }
 	*/
 	
-	/*
+	
     async function startViewing() {
         if (!streamerId) {
             console.error("No se ha recibido el ID del streamer.");
@@ -2951,107 +2951,8 @@
             showPlaceholder("Error al conectar con el streamer.");
         }
     }
-	*/
 	
-	const MAX_METADATA_RETRIES = 50; // Máximo de 50 reintentos (~5 segundos)
-
-    async function startViewing() {
-            if (!streamerId) {
-                console.error("No se ha recibido el ID del streamer.");
-                showPlaceholder("No hay streamer disponible.");
-                return;
-            }
-            if (!liveStreamVideo || !videoContainer) {
-                console.error("Elementos de video o contenedor no encontrados en el DOM.");
-                showPlaceholder("Error: Elemento de video no encontrado.");
-                return;
-            }
-            try {
-                console.log("Iniciando conexión WebRTC como espectador...");
-                peerConnection = new RTCPeerConnection(configuration);
-                pendingCandidates['viewer'] = [];
-
-                peerConnection.ontrack = (event) => {
-                    console.log("-> EVENTO ONTRACK DISPARADO");
-                    console.log("Pistas de video:", event.streams[0].getVideoTracks());
-                    console.log("Pistas de audio:", event.streams[0].getAudioTracks());
-                    liveStreamVideo.srcObject = event.streams[0];
-                    showStream();
-
-                    // Intentar reproducir el video inmediatamente
-                    console.log("Intentando reproducir el video...");
-                    liveStreamVideo.play().catch(err => {
-                        console.error("Error al reproducir el video:", err);
-                        showPlaceholder("Error al reproducir el video. Verifica la conexión.");
-                    });
-
-                    const videoTrack = event.streams[0].getVideoTracks()[0];
-                    if (videoTrack) {
-                        let retryCount = 0;
-                        const tryMetadata = () => {
-                            const settings = videoTrack.getSettings();
-                            if (settings.width && settings.height) {
-                                const width = settings.width;
-                                const height = settings.height;
-                                const aspectRatio = width / height;
-                                console.log(`[Viewer] Resolución recibida: ${width}x${height}, Aspect Ratio: ${aspectRatio}`);
-                                videoContainer.style.width = `${Math.min(window.innerWidth - 40, width)}px`;
-                                videoContainer.style.height = `${Math.min(window.innerWidth - 40, width) / aspectRatio}px`;
-                                videoContainer.style.aspectRatio = aspectRatio;
-                            } else if (retryCount < MAX_METADATA_RETRIES) {
-                                console.log("Metadatos no disponibles, reintentando...");
-                                retryCount++;
-                                setTimeout(tryMetadata, 100);
-                            } else {
-                                console.error("No se pudieron obtener los metadatos después de varios intentos.");
-                                videoContainer.style.width = '640px';
-                                videoContainer.style.height = '480px';
-                                videoContainer.style.aspectRatio = 640 / 480;
-                            }
-                        };
-                        tryMetadata();
-                    } else {
-                        console.error("No se encontraron pistas de video.");
-                        showPlaceholder("No se encontraron pistas de video.");
-                    }
-                };
-
-                peerConnection.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        console.log('Enviando candidato ICE:', event.candidate);
-                        ws.send(JSON.stringify({ 
-                            type: 'candidate', 
-                            candidate: event.candidate,
-                            target_id: streamerId,
-                            from_id: currentUsername
-                        }));
-                    }
-                };
-
-                peerConnection.oniceconnectionstatechange = () => {
-                    console.log("Estado de conexión ICE:", peerConnection.iceConnectionState);
-                    if (peerConnection.iceConnectionState === 'failed') {
-                        console.error("Fallo en la conexión ICE. Reintentando...");
-                        peerConnection.restartIce();
-                    }
-                };
-
-                peerConnection.addTransceiver('video', {'direction': 'recvonly'});
-                peerConnection.addTransceiver('audio', {'direction': 'recvonly'});
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-                console.log("Oferta enviada:", offer);
-                ws.send(JSON.stringify({ 
-                    type: 'offer', 
-                    offer: { type: offer.type, sdp: offer.sdp }, 
-                    from_id: currentUsername, 
-                    target_id: streamerId 
-                }));
-            } catch (error) {
-                console.error("Error en startViewing:", error);
-                showPlaceholder("Error al conectar con el streamer.");
-            }
-        }
+	
     async function handleOffer(offer, viewerId) {
         console.log(`Manejando oferta de ${viewerId}`);
         const pc = new RTCPeerConnection(configuration);
