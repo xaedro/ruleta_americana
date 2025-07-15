@@ -2857,7 +2857,7 @@
                 console.log("Recibiendo pista de video...");
                 console.log("Pistas de video:", event.streams[0].getVideoTracks());
                 console.log("Pistas de audio:", event.streams[0].getAudioTracks());
-                videoElement.srcObject = event.streams[0];
+                liveStreamVideo.srcObject = event.streams[0];
                 showStream();
 
                 // Intentar obtener la resolución desde la pista de video
@@ -2877,7 +2877,7 @@
 
                         // Intentar reproducir el video
                         console.log("Intentando reproducir el video...");
-                        videoElement.play().catch(err => {
+                        liveStreamVideo.play().catch(err => {
                             console.error("Error al reproducir el video:", err);
                             showPlaceholder("Error al reproducir el video. Verifica la conexión.");
                         });
@@ -2898,7 +2898,7 @@
                     showPlaceholder("No se encontraron pistas de video.");
                 }
 
-                videoElement.onerror = (err) => {
+                liveStreamVideo.onerror = (err) => {
                     console.error("Error en el elemento de video:", err);
                     showPlaceholder("Error al cargar el video. Verifica la fuente.");
                 };
