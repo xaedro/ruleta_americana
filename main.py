@@ -946,7 +946,7 @@ async def get_old_version():
 
 @app.get("/")
 async def get_new_version():
-    return FileResponse(os.path.join(os.path.dirname(__file__), "index4.html"))
+    return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"))
 
 @app.get("/favicon.ico")
 async def get_favicon():
