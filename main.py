@@ -949,19 +949,19 @@ manager = ConnectionManager()
 @app.post("/send/")
 async def receive_event(event: Event):
 	print("Se recibe: ", event.content)
-    #await manager.broadcast_to_users_text(event.content)
-    return {"status": "evento enviado"}
+	#await manager.broadcast_to_users_text(event.content)
+	return {"status": "evento enviado"}
 
 @app.post("/numero_caido/")
 async def numero_caido(evento: NumeroCaido):
-    #await manager.broadcast_to_users_text(f"Número caído: {evento.numero}")
+	#await manager.broadcast_to_users_text(f"Número caído: {evento.numero}")
 	print("Recibido: ", evento.numero)
-    # Tu lógica de ganadores...
-    return {"status": "mensaje enviado"}
+	# Tu lógica de ganadores...
+	return {"status": "mensaje enviado"}
 
 @app.get("/cron")
 async def cron():
-    return {"status": "ok"}
+	return {"status": "ok"}
 
 # --- ENDPOINTS HTTP ---
 @app.get("/old")
