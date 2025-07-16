@@ -946,6 +946,19 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+@app.post("/send/")
+async def receive_event(event: Event):
+	print("Se recibe: ", event.content)
+    #await manager.broadcast_to_users_text(event.content)
+    return {"status": "evento enviado"}
+
+@app.post("/numero_caido/")
+async def numero_caido(evento: NumeroCaido):
+    #await manager.broadcast_to_users_text(f"Número caído: {evento.numero}")
+	print("Recibido: ", evento.numero)
+    # Tu lógica de ganadores...
+    return {"status": "mensaje enviado"}
+
 @app.get("/cron")
 async def cron():
     return {"status": "ok"}
@@ -978,13 +991,14 @@ async def recibir_consecutivo(data: ConsecutiveData):
 	return {"status": "ok"}
 """
 
-"""
+
 @app.post("/fecha_hora/")
 async def recibir_fecha_hora(data: DateTimeData):
 	payload = {"type": "fecha_hora", "payload": data.fecha_hora_str}
+	print("Fecha y hora: ", data.fecha_hora_str)
 	await manager.broadcast_json(payload)
 	return {"status": "ok"}
-"""
+
 
 @app.post("/stream_ended")
 async def notify_stream_ended(x_secret_key: Optional[str] = Header(None)):
