@@ -2405,13 +2405,10 @@
 			<button id="startButton">INICIAR TRANSMISIÓN</button>
 		</div>
 		<br>
-		<p id="fecha_hora">Fecha y Hora: Esperando...</p>
-		<p id="juego_numero">Juego Número: Esperando...</p>
-		<p id="usuarios">Usuarios conectados: 0</p>
-		<h1>Realiza tu apuesta</h1>
+		<h3>Realiza tu apuesta</h3>
 		<form onsubmit="sendMessage(event)">
 			<label>Jugador: <strong id="nombre-logueado"></strong></label>
-			<br><br>
+			<br>
 			<input type="number" id="apuesta" placeholder="Número de apuesta" autocomplete="off" min="0" max="36" required/>
 			<button id="btnEnviarApuesta" disabled>Enviar</button>
 		</form>
@@ -2429,9 +2426,9 @@
 	const liveStreamVideo = document.getElementById('live-stream');
 	const streamPlaceholder = document.getElementById('streamPlaceholder');
 	
-	const fechaHoraElem = document.getElementById('fecha_hora');
-	const juegoNumeroElem = document.getElementById('juego_numero');
-	const usuariosElem = document.getElementById('usuarios');
+	//const fechaHoraElem = document.getElementById('fecha_hora');
+	//const juegoNumeroElem = document.getElementById('juego_numero');
+	//const usuariosElem = document.getElementById('usuarios');
 	const messagesElem = document.getElementById('messages');
 	
 	const nombreLogueadoElem = document.getElementById('nombre-logueado');
@@ -2495,6 +2492,7 @@
 	};
 	*/
 	
+	/*
 	// Función para actualizar la fecha y hora cada segundo
 	function startDateTimeUpdate(fechaHoraStr) {
 		if (intervalId) {
@@ -2510,7 +2508,7 @@
 			fechaHoraElem.textContent = formattedDateTime;
 		}, 1000);
 	}
-		
+	*/
 	// INICIO DEL FLUJO DE LA APLICACIÓN
 	loginForm.onsubmit = (event) => {
 		event.preventDefault();
@@ -2711,17 +2709,23 @@
 						console.log(`Candidato ICE recibido de ${data.from_id} para ${data.target_id}`);
 						await handleCandidate(data.candidate, data.from_id);
 						break;
+					/*
 					case 'fecha_hora':
 						console.log(`Recibido un cambio en fecha_hora ${data.payload}`);
 						fechaHoraElem.textContent = 'Fecha y Hora: ' + data.payload;
 						startDateTimeUpdate(data.payload);
 						break;
+					*/
+					/*
 					case 'juego_numero':
 						juegoNumeroElem.textContent = `Juego Número: ${data.payload}`;
 						break;
+					*/
+					/*
 					case 'usuarios_conectados':
 						usuariosElem.textContent = `Usuarios conectados: ${data.payload}`;
 						break;
+					*/
 					default:
 						console.log("Mensaje JSON desconocido:", data);
 				}

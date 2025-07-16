@@ -964,6 +964,7 @@ async def get_favicon():
 	raise HTTPException(status_code=404, detail="Favicon not found")
 """
 
+"""
 @app.post("/consecutivo_juego/")
 async def recibir_consecutivo(data: ConsecutiveData):
 	# Almacenar el consecutive_id en el ConnectionManager
@@ -971,12 +972,15 @@ async def recibir_consecutivo(data: ConsecutiveData):
 	payload = {"type": "juego_numero", "payload": data.consecutive_id}
 	await manager.broadcast_json(payload)
 	return {"status": "ok"}
+"""
 
+"""
 @app.post("/fecha_hora/")
 async def recibir_fecha_hora(data: DateTimeData):
 	payload = {"type": "fecha_hora", "payload": data.fecha_hora_str}
 	await manager.broadcast_json(payload)
 	return {"status": "ok"}
+"""
 
 @app.post("/stream_ended")
 async def notify_stream_ended(x_secret_key: Optional[str] = Header(None)):
