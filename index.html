@@ -2741,7 +2741,7 @@
 					btnEnviarApuesta.disabled = true;
 					console.log("Apuestas deshabilitadas.");
 				} else if (messageText.startsWith("Usuarios conectados:")) {
-					usuariosElem.textContent = messageText;
+					//usuariosElem.textContent = messageText;
 				} else {
 					const li = document.createElement('li');
 					li.textContent = messageText;
@@ -2757,7 +2757,7 @@
 				intervalId = null;
 			}
 			//fechaHoraElem.textContent = 'Fecha y Hora: Desconectado';
-			usuariosElem.textContent = 'Usuarios conectados: 0';
+			//usuariosElem.textContent = 'Usuarios conectados: 0';
 			clearInterval(heartbeatInterval);
 			ws = null;
 			if (retryCount < maxRetries) {
