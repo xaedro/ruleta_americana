@@ -954,8 +954,9 @@ async def receive_event(event: Event):
 
 @app.post("/numero_caido/")
 async def numero_caido(evento: NumeroCaido):
+	numero_ganador = evento.numero
 	#await manager.broadcast_to_users_text(f"Número caído: {evento.numero}")
-	print("Recibido: ", evento.numero)
+	print("Recibido: numero_ganador = ", numero_ganador)
 	# Tu lógica de ganadores...
 	return {"status": "mensaje enviado"}
 
