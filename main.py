@@ -838,8 +838,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- MIDDLEWARE DE PERMISOS ---
+# Middleware para Permissions-Policy y filtrado de /cron
 class PermissionsPolicyMiddleware(BaseHTTPMiddleware):
 	async def dispatch(self, request: Request, call_next):
+		# Filtrar solicitudes al endpoint /cron
+		if request.url.path == "/cron":
+			user_agent = request.headers.get("User-Agent", "")
+			if "cron-job.org" not in user_agent.lower():
+				return {"status": "forbidden", "message": "Acceso denegado"}
+		
 		response = await call_next(request)
 		response.headers['Permissions-Policy'] = 'display-capture=(self)'
 		return response
