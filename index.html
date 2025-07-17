@@ -3202,7 +3202,7 @@
 			const seconds = now.getSeconds().toString().padStart(2, '0');
 			const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
 			//datetimeDiv.textContent = `Fecha: ${date} Hora: ${hours}:${minutes}:${seconds} ${ampm}`;
-			datetimeDiv.textContent = `Hora: ${hours}:${minutes}:${seconds} ${ampm}`;
+			datetimeDiv.textContent = `${hours}:${minutes}:${seconds} ${ampm}`;
 		}
 
 		// Actualizar la hora cada segundo
