@@ -3218,11 +3218,19 @@
 	document.addEventListener('mousemove', (e) => {
 		if (isDragging) {
 			e.preventDefault();
+			// Inicializar posiciones
+			currentX = window.innerWidth / 2 - 125; // Centra horizontalmente (125 es la mitad del ancho del div)
+			currentY = 10;
+			datetimeDiv.style.left = `${currentX}px`;
+			datetimeDiv.style.top = `${currentY}px`;
+			datetimeDiv.style.transform = 'translateX(0)'; // Ajustar para que no se desplace por transform
+			/*
 			currentX = e.clientX - initialX;
 			currentY = e.clientY - initialY;
 			datetimeDiv.style.left = `${currentX}px`;
 			datetimeDiv.style.top = `${currentY}px`;
 			datetimeDiv.style.transform = 'none'; // Eliminar el centrado inicial
+			*/
 		}
 	});
 
