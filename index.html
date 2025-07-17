@@ -3092,11 +3092,28 @@
 		h3 {
 			text-align: center;
 		}
+		/*
 		#datetime-div {
 			position: fixed;
 			top: 10px;
 			left: 50%;
 			transform: translateX(-50%);
+			background-color: rgba(0, 0, 0, 0.7);
+			color: white;
+			padding: 10px 20px;
+			border-radius: 5px;
+			font-size: 16px;
+			z-index: 1000;
+			cursor: move;
+			user-select: none;
+			width: 250px;
+			text-align: center;
+			line-height: 1.5;
+		}
+		*/
+		#datetime-div {
+			position: fixed;
+			top: 10px;
 			background-color: rgba(0, 0, 0, 0.7);
 			color: white;
 			padding: 10px 20px;
@@ -3158,7 +3175,7 @@
 	const welcomeContainer = document.getElementById('welcome-container');
 	const enterGameButton = document.getElementById('enter-game-button');
 	const videoContainer = document.querySelector('.video-container');
-	const datetimeDiv = document.getElementById('datetime-div');
+	//const datetimeDiv = document.getElementById('datetime-div');
 
 	// Estado Global y Configuración
 	let ws = null;
@@ -3172,6 +3189,75 @@
 	const pendingCandidates = {};
 	let intervalId = null;
 	let currentDateTime = null;
+	
+	document.addEventListener('DOMContentLoaded', () => {
+		const datetimeDiv = document.getElementById('datetime-div');
+
+		// Función para actualizar la fecha y hora en formato 12 horas
+		function updateDateTime() {
+			const now = new Date();
+			const date = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+			const hours = now.getHours() % 12 || 12;
+			const minutes = now.getMinutes().toString().padStart(2, '0');
+			const seconds = now.getSeconds().toString().padStart(2, '0');
+			const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
+			datetimeDiv.textContent = `Fecha: ${date} Hora: ${hours}:${minutes}:${seconds} ${ampm}`;
+		}
+
+		// Actualizar la hora cada segundo
+		setInterval(updateDateTime, 1000);
+		updateDateTime();
+
+		// Funcionalidad para arrastrar el div
+		let isDragging = false;
+		let currentX;
+		let currentY;
+		let initialX;
+		let initialY;
+
+		datetimeDiv.addEventListener('mousedown', (e) => {
+			isDragging = true;
+			// Obtener la posición actual del div
+			const rect = datetimeDiv.getBoundingClientRect();
+			currentX = rect.left;
+			currentY = rect.top;
+			initialX = e.clientX - currentX;
+			initialY = e.clientY - currentY;
+			datetimeDiv.style.cursor = 'grabbing';
+		});
+
+		document.addEventListener('mousemove', (e) => {
+			if (isDragging) {
+				e.preventDefault();
+				currentX = e.clientX - initialX;
+				currentY = e.clientY - initialY;
+				datetimeDiv.style.left = `${currentX}px`;
+				datetimeDiv.style.top = `${currentY}px`;
+				datetimeDiv.style.transform = 'none'; // Eliminar transform para evitar conflictos
+			}
+		});
+
+		document.addEventListener('mouseup', () => {
+			isDragging = false;
+			datetimeDiv.style.cursor = 'move';
+		});
+
+		// Inicializar posición centrada horizontalmente
+		function centerDiv() {
+			const windowWidth = window.innerWidth;
+			const divWidth = datetimeDiv.offsetWidth;
+			currentX = (windowWidth - divWidth) / 2; // Centrar horizontalmente
+			currentY = 10; // Mantener en la parte superior
+			datetimeDiv.style.left = `${currentX}px`;
+			datetimeDiv.style.top = `${currentY}px`;
+			datetimeDiv.style.transform = 'none';
+		}
+
+		centerDiv();
+
+		// Ajustar posición al redimensionar la ventana
+		window.addEventListener('resize', centerDiv);
+	});
 
 	const configuration = {
 		iceServers: [
@@ -3185,7 +3271,8 @@
 			}
 		]
 	};
-
+	
+	/*
 	// Función para actualizar la fecha y hora en formato 12 horas
 	function updateDateTime() {
 		const now = new Date();
@@ -3224,13 +3311,6 @@
 			datetimeDiv.style.left = `${currentX}px`;
 			datetimeDiv.style.top = `${currentY}px`;
 			datetimeDiv.style.transform = 'translateX(0)'; // Ajustar para que no se desplace por transform
-			/*
-			currentX = e.clientX - initialX;
-			currentY = e.clientY - initialY;
-			datetimeDiv.style.left = `${currentX}px`;
-			datetimeDiv.style.top = `${currentY}px`;
-			datetimeDiv.style.transform = 'none'; // Eliminar el centrado inicial
-			*/
 		}
 	});
 
@@ -3244,7 +3324,9 @@
 	currentY = 10;
 	datetimeDiv.style.left = `${currentX}px`;
 	datetimeDiv.style.top = `${currentY}px`;
-
+	*/
+	
+	
 	// INICIO DEL FLUJO DE LA APLICACIÓN
 	loginForm.onsubmit = (event) => {
 		event.preventDefault();
