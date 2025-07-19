@@ -3177,7 +3177,7 @@
 		// Función para actualizar la fecha y hora en formato 12 horas
 		function updateDateTime() {
 			const now = new Date();
-			const date = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+			//const date = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
 			const hours = now.getHours() % 12 || 12;
 			const minutes = now.getMinutes().toString().padStart(2, '0');
 			const seconds = now.getSeconds().toString().padStart(2, '0');
@@ -3248,8 +3248,8 @@
 			},
 			{
 				"urls": "turn:relay1.expressturn.com:3480?transport=tcp",
-				"username": "000000002067654307",
-				"credential": "1jzG+9wsEaf0vTCLYDavBWY/TC4="
+				"username": "000000002068306048",
+				"credential": "yvlX4YwBtl24+wxXcyFX932JjaI="
 			}
 		]
 	};
