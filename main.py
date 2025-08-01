@@ -35,15 +35,15 @@ class PermissionsPolicyMiddleware(BaseHTTPMiddleware):
 		return response
 
 # --- MIDDLEWARE DE CORS ---
-"""
-app.add_middleware(
-	CORSMiddleware,
-	allow_origins=["https://ruleta-americana.onrender.com"],
-	allow_credentials=True,
-	allow_methods=["*"],
-	allow_headers=["*"],
-)
-"""
+
+#app.add_middleware(
+#	CORSMiddleware,
+#	allow_origins=["https://ruleta-americana.onrender.com"],
+#	allow_credentials=True,
+#	allow_methods=["*"],
+#	allow_headers=["*"],
+#)
+
 app.add_middleware(
 	CORSMiddleware,
 	allow_origins=["https://ruletaamericana.up.railway.app"],
