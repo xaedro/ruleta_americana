@@ -908,6 +908,7 @@
     let heartbeatInterval;
 
     // Configuración WebRTC
+	/*
     const configuration = {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
@@ -918,7 +919,21 @@
         }
       ]
     };
-
+    */
+	
+	const configuration = {
+		iceServers: [
+			{
+				"urls": "stun:relay1.expressturn.com:3478"
+			},
+			{
+				"urls": "turn:relay1.expressturn.com:3478?transport=tcp",
+				"username": "000000002069365339",
+				"credential": "UFUNfwsJ47YX6sDdFHuqnF9U99I="
+			}
+		]
+	};
+	
     // Manejo de Fecha y Hora local
     document.addEventListener('DOMContentLoaded', () => {
       function updateDateTime() {
