@@ -138,11 +138,11 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-"""
-@app.get("/cron")
-async def cron():
-	return {"status": "ok"}
-"""
+
+#@app.get("/cron")
+#async def cron():
+#	return {"status": "ok"}
+
 
 # --- ENDPOINTS HTTP ---
 @app.get("/old")
