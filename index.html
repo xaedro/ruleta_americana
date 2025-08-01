@@ -325,7 +325,8 @@
     function connectWebSocket(username) {
       console.log("Intentando conectar WebSocket...");
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsHost = process.env.NODE_ENV === 'production' ? 'ruletaamericana.up.railway.app' : 'localhost:8000';
+      //const wsHost = process.env.NODE_ENV === 'production' ? 'ruletaamericana.up.railway.app' : 'localhost:8000';
+      const wsHost = window.location.host;
       ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/users`);
 
       let retryCount = 0;
