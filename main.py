@@ -284,13 +284,15 @@ import asyncio
 import json
 import logging
 import os
-from typing import Dict, List, Optional
+from typing import cast, Dict, List, Optional
 import uuid
 
 from fastapi import FastAPI, Request, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
 from pydantic import BaseModel
 
 app = FastAPI()
