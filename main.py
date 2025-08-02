@@ -732,9 +732,19 @@ async def websocket_users(websocket: WebSocket):
 						json.dumps({"type": "login_success", "role": "streamer", "streamer_id": client_id, "client_id": client_id})
 					)
 				else:
-					await websocket.send_text(
-						json.dumps({"type": "login_success", "role": "viewer", "client_id": client_id})
-					)
+					#await websocket.send_text(
+					#	json.dumps({"type": "login_success", "role": "viewer", "client_id": client_id})
+					#)
+					# Enviar streamer_id a los viewers si el streamer está conectado
+                    response = {
+                        "type": "login_success",
+                        "role": "viewer",
+                        "client_id": client_id
+                    }
+                    if manager.streamer_id:
+                        response["streamer_id"] = manager.streamer_id
+                    await websocket.send_text(json.dumps(response))
+
 				logger.info(f"Cliente {client_id} autenticado como {username}")
 
 			elif msg_type in ["offer", "answer", "candidate"]:
