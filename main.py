@@ -601,7 +601,7 @@ async def websocket_users(websocket: WebSocket):
 				continue
 
 			elif msg_type == "login":
-				 username = data.get("name")
+				username = data.get("name")
 				clients[client_id]["username"] = username
 				if username == "mario":
 					global streamer_id
