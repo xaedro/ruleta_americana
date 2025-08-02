@@ -1194,18 +1194,22 @@
               const gameEventLi = document.createElement('li');
               switch (data.payload) {
                 case 'game_started':
+                  console.log('game_started');
                   gameEventLi.textContent = "El juego ha comenzado";
                   btnEnviarApuesta.disabled = false;
                   break;
                 case 'game_ended':
+                  console.log('game_ended');
                   gameEventLi.textContent = "El juego ha terminado";
                   btnEnviarApuesta.disabled = true;
                   break;
                 case 'bets_open':
+                  console.log('bets_open');
                   gameEventLi.textContent = "Apuestas abiertas";
                   btnEnviarApuesta.disabled = false;
                   break;
                 case 'bets_closed':
+                  console.log('bets_closed');
                   gameEventLi.textContent = "Apuestas cerradas";
                   btnEnviarApuesta.disabled = true;
                   break;
