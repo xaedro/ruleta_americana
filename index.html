@@ -1024,7 +1024,8 @@
         startViewing();
       }
     };
-
+	
+	/*
     startButton.onclick = async () => {
       startButton.disabled = true;
       startButton.textContent = "CARGANDO...";
@@ -1091,7 +1092,83 @@
         startButton.textContent = "INICIAR TRANSMISIÓN";
       }
     };
-
+	*/
+	
+	startButton.onclick = async () => {
+		startButton.disabled = true;
+		startButton.textContent = "CARGANDO...";
+		try {
+			if (localStream) {
+				localStream.getTracks().forEach(track => track.stop());
+				localStream = null;
+				console.log("Stream anterior liberado.");
+			}
+			Object.values(peerConnections).forEach(pc => pc.close());
+			peerConnections = {};
+			showPlaceholder("Selecciona 'OBS-Camera' o 'OBS Virtual Camera' en el diálogo.");
+			console.log("Solicitando acceso a cámara/micrófono...");
+			localStream = await navigator.mediaDevices.getUserMedia({
+				video: true,
+				audio: true
+			});
+			console.log("Pistas capturadas:", localStream.getVideoTracks(), localStream.getAudioTracks());
+			if (localStream.getVideoTracks().length === 0) {
+				console.error("No se detectó video. Verifica OBS.");
+				showPlaceholder("No se detectó video. Verifica OBS.");
+				alert("No se detectó video. Asegúrate de que OBS esté abierto, la cámara virtual esté activada (Tools > VirtualCam > Start), y selecciona 'OBS-Camera'.");
+				isStreaming = false;
+				startButton.disabled = false;
+				startButton.textContent = "INICIAR TRANSMISIÓN";
+				return;
+			}
+			liveStreamVideo.srcObject = localStream;
+			liveStreamVideo.muted = true;
+			showStream();
+			isStreaming = true; // Establecer isStreaming a true aquí
+			const videoTrack = localStream.getVideoTracks()[0];
+			if (videoTrack) {
+				const settings = videoTrack.getSettings();
+				const width = settings.width;
+				const height = settings.height;
+				const aspectRatio = width / height;
+				console.log(`[Streamer] Resolución capturada: ${width}x${height}, Aspect Ratio: ${aspectRatio}`);
+				videoContainer.style.width = `${width}px`;
+				videoContainer.style.aspectRatio = aspectRatio;
+				console.log("Enviando mensaje start_stream...");
+				ws.send(JSON.stringify({
+					type: 'start_stream',
+					from_id: currentUsername,
+					video_dimensions: { width, height, aspectRatio }
+				}));
+				console.log("Mensaje start_stream enviado con éxito");
+			}
+			setTimeout(() => {
+				if (isStreaming) {
+					startButton.disabled = false;
+					startButton.textContent = "CAMBIAR FUENTE";
+				}
+			}, 5000);
+			localStream.getVideoTracks()[0].onended = () => {
+				console.log("Stream detenido por el usuario");
+				ws.send(JSON.stringify({ type: 'stream_ended', from_id: currentUsername }));
+				isStreaming = false;
+				startButton.disabled = false;
+				startButton.textContent = "INICIAR TRANSMISIÓN";
+				localStream.getTracks().forEach(track => track.stop());
+				localStream = null;
+				Object.values(peerConnections).forEach(pc => pc.close());
+				peerConnections = {};
+				showPlaceholder("Transmisión finalizada.");
+			};
+		} catch (err) {
+			console.error("Error al capturar la cámara virtual de OBS:", err);
+			showPlaceholder("Error al capturar la cámara virtual. Verifica OBS.");
+			alert("Error al capturar la cámara virtual. Asegúrate de que OBS esté abierto, la cámara virtual esté activada, y selecciona 'OBS-Camera'.");
+			isStreaming = false;
+			startButton.disabled = false;
+			startButton.textContent = "INICIAR TRANSMISIÓN";
+		}
+	};
     // LÓGICA DE WEBSOCKET
     function connectWebSocket(username) {
       console.log("Intentando conectar WebSocket...");
@@ -1120,6 +1197,7 @@
           console.log("Mensaje recibido:", data);
 
           switch (data.type) {
+			/*
             case 'login_success':
               userRole = data.role;
               streamerId = data.streamer_id || '';
@@ -1132,7 +1210,22 @@
               welcomeContainer.style.display = 'block';
               nombreLogueadoElem.textContent = currentUsername;
               break;
-
+			*/
+			case 'login_success':
+				userRole = data.role;
+				streamerId = data.streamer_id || '';
+				console.log(`Rol asignado: ${userRole}, Streamer ID: ${streamerId}`);
+				loginContainer.style.display = 'none';
+				welcomeContainer.style.display = 'block';
+				nombreLogueadoElem.textContent = currentUsername;
+				if (userRole === 'viewer' && streamerId) {
+					console.log("Iniciando visualización para espectador con streamer_id:", streamerId);
+					startViewing();
+				} else if (!streamerId && userRole === 'viewer') {
+					console.warn("No se recibió streamer_id. No se puede iniciar visualización.");
+					showPlaceholder("No hay streamer disponible.");
+				}
+				break;
             case 'stream_started':
               isStreaming = true;
               console.log("Stream iniciado. Estado isStreaming:", isStreaming);
@@ -1336,6 +1429,7 @@
     }
 
     // LÓGICA DE WEBRTC
+	/*
     async function startViewing() {
       if (!streamerId) {
         console.error("No se ha recibido el ID del streamer.");
@@ -1421,7 +1515,96 @@
         showPlaceholder("Error al conectar con el streamer.");
       }
     }
-
+	*/
+	async function startViewing() {
+		if (!streamerId) {
+			console.error("No se ha recibido el ID del streamer.");
+			showPlaceholder("No hay streamer disponible.");
+			return;
+		}
+		try {
+			if (peerConnection) {
+				peerConnection.close();
+				peerConnection = null;
+				console.log("Conexión WebRTC anterior cerrada.");
+			}
+			console.log("Iniciando conexión WebRTC como espectador con streamer_id:", streamerId);
+			peerConnection = new RTCPeerConnection(configuration);
+			pendingCandidates['viewer'] = [];
+			peerConnection.ontrack = (event) => {
+				console.log("-> EVENTO ONTRACK DISPARADO");
+				const remoteStream = event.streams[0];
+				console.log("Pistas de video:", remoteStream.getVideoTracks());
+				console.log("Pistas de audio:", remoteStream.getAudioTracks());
+				if (liveStreamVideo.srcObject !== remoteStream) {
+					console.log("Asignando nuevo stream al elemento de video.");
+					liveStreamVideo.srcObject = remoteStream;
+				}
+				liveStreamVideo.muted = true;
+				liveStreamVideo.playsInline = true;
+				const playVideo = () => {
+					liveStreamVideo.play().then(() => {
+						console.log("¡Reproducción iniciada!");
+						showStream();
+					}).catch(error => {
+						console.error("Error al reproducir video:", error);
+						showPlaceholder("Haz clic para reproducir la transmisión.");
+						liveStreamVideo.addEventListener('click', playVideo, { once: true });
+					});
+				};
+				playVideo();
+			};
+			peerConnection.onicecandidate = (event) => {
+				if (event.candidate) {
+					console.log('Enviando candidato ICE:', event.candidate);
+					ws.send(JSON.stringify({
+						type: 'candidate',
+						candidate: event.candidate,
+						target_id: streamerId,
+						from_id: currentUsername
+					}));
+				}
+			};
+			peerConnection.oniceconnectionstatechange = () => {
+				console.log("Estado de conexión ICE:", peerConnection.iceConnectionState);
+				if (peerConnection.iceConnectionState === 'failed') {
+					console.error("Fallo en la conexión ICE. Detalles:", {
+						iceConnectionState: peerConnection.iceConnectionState,
+						iceGatheringState: peerConnection.iceGatheringState,
+						signalingState: peerConnection.signalingState
+					});
+					showPlaceholder("Error de conexión WebRTC. Intenta de nuevo.");
+					peerConnection.restartIce();
+				}
+			};
+			console.log("Añadiendo transceivers para video y audio...");
+			peerConnection.addTransceiver('video', { direction: 'recvonly' });
+			peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+			console.log("Creando oferta WebRTC...");
+			const offer = await peerConnection.createOffer();
+			await peerConnection.setLocalDescription(offer);
+			console.log("Oferta enviada:", offer);
+			ws.send(JSON.stringify({
+				type: 'offer',
+				offer: { type: offer.type, sdp: offer.sdp },
+				from_id: currentUsername,
+				target_id: streamerId
+			}));
+			console.log("Oferta WebRTC enviada al streamer");
+			if (pendingCandidates['viewer'].length > 0) {
+				console.log("Procesando candidatos pendientes para viewer...");
+				for (const candidate of pendingCandidates['viewer']) {
+					await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+					console.log("Candidato ICE añadido para viewer");
+				}
+				pendingCandidates['viewer'] = [];
+			}
+		} catch (error) {
+			console.error("Error en startViewing:", error);
+			showPlaceholder("Error al conectar con el streamer.");
+		}
+	}
+	
     async function handleOffer(offer, viewerId) {
       console.log(`Manejando oferta de ${viewerId}`);
       if (peerConnections[viewerId]) {
