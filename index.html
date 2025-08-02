@@ -905,7 +905,7 @@
     let currentUsername = '';
     let streamerId = '';
     const pendingCandidates = {};
-    let heartbeatInterval;
+    //let heartbeatInterval;
 
     // Configuración WebRTC
 	/*
@@ -1107,9 +1107,9 @@
         ws.send(JSON.stringify({ type: "login", name: username }));
         retryCount = 0;
         heartbeatInterval = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }));
-          }
+          //if (ws.readyState === WebSocket.OPEN) {
+          //  ws.send(JSON.stringify({ type: 'ping' }));
+          //}
         }, 10000);
       };
 
