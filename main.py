@@ -736,14 +736,14 @@ async def websocket_users(websocket: WebSocket):
 					#	json.dumps({"type": "login_success", "role": "viewer", "client_id": client_id})
 					#)
 					# Enviar streamer_id a los viewers si el streamer está conectado
-                    response = {
-                        "type": "login_success",
-                        "role": "viewer",
-                        "client_id": client_id
-                    }
-                    if manager.streamer_id:
-                        response["streamer_id"] = manager.streamer_id
-                    await websocket.send_text(json.dumps(response))
+					response = {
+						"type": "login_success",
+						"role": "viewer",
+						"client_id": client_id
+					}
+					if manager.streamer_id:
+						response["streamer_id"] = manager.streamer_id
+					await websocket.send_text(json.dumps(response))
 
 				logger.info(f"Cliente {client_id} autenticado como {username}")
 
