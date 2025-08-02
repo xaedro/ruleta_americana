@@ -578,7 +578,7 @@ async def broadcast(message):
 # --- ENDPOINT WEBSOCKET ---
 @app.websocket("/ws/users")
 async def websocket_users(websocket: WebSocket):
-await websocket.accept()
+	await websocket.accept()
 	client_id = str(uuid.uuid4())
 	clients[client_id] = {"websocket": websocket, "username": None}
 	print(f"Nuevo cliente conectado con ID: {client_id}")
