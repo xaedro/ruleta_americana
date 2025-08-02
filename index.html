@@ -908,7 +908,6 @@
     //let heartbeatInterval;
 
     // Configuración WebRTC
-	/*
     const configuration = {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
@@ -919,8 +918,9 @@
         }
       ]
     };
-    */
+    
 	
+	/*
 	const configuration = {
 		iceServers: [
 			{
@@ -933,6 +933,7 @@
 			}
 		]
 	};
+	*/
 	
     // Manejo de Fecha y Hora local
     document.addEventListener('DOMContentLoaded', () => {
@@ -1606,7 +1607,7 @@
 	}
 	
     async function handleOffer(offer, viewerId) {
-      console.log(`Manejando oferta de ${viewerId}`);
+      console.log(`Manejando OFFER ${offer}  viewerId ${viewerId}`);
       if (peerConnections[viewerId]) {
         peerConnections[viewerId].close();
         delete peerConnections[viewerId];
@@ -1681,6 +1682,7 @@
     }
 
     async function handleAnswer(answer, fromId) {
+      console.log(`Manejando ANSWER ${answer} fromId ${fromId}`);
       const pc = peerConnection;
       if (pc) {
         try {
@@ -1706,6 +1708,7 @@
     }
 
     async function handleCandidate(candidate, fromId) {
+      console.log(`Manejando CANDIDATE ${candidate} fromId ${fromId}`);
       const pc = (userRole === 'streamer') ? peerConnections[fromId] : peerConnection;
       if (pc) {
         try {
