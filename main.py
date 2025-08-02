@@ -788,8 +788,8 @@ async def websocket_users(websocket: WebSocket):
 			elif msg_type == "apuesta":
 				await manager.broadcast_json(data)
 
-	except WebSocketDisconnect:
-		logger.info(f"Cliente {client_id} desconectado con código {websocket.close_code}")
+	except WebSocketDisconnect as e:
+		logger.info(f"Cliente {client_id} desconectado con código {e.code}")
 		manager.disconnect(client_id)
 	except (ValueError, json.JSONDecodeError) as e:
 		logger.error(f"Error de formato de mensaje del cliente {client_id}: {str(e)}")
