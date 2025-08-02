@@ -1584,7 +1584,7 @@
 			console.log("Creando oferta WebRTC...");
 			const offer = await peerConnection.createOffer();
 			await peerConnection.setLocalDescription(offer);
-			console.log("Oferta enviada:", offer);
+			console.log("Oferta enviada:", offer.toString().substring(0, 30));
 			ws.send(JSON.stringify({
 				type: 'offer',
 				offer: { type: offer.type, sdp: offer.sdp },
