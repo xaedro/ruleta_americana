@@ -559,7 +559,7 @@ async def websocket_users(websocket: WebSocket):
 
 """
 async def broadcast(message):
-	"""Enviar mensaje a todos los clientes conectados"""
+	# Enviar mensaje a todos los clientes conectados 
 	global streamer_id  # Declara la variable global al inicio
 	disconnected_clients = []
 	for client_id, client_info in clients.items():
