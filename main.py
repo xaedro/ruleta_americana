@@ -76,68 +76,67 @@ class DateTimeData(BaseModel):
 
 # --- CONNECTION MANAGER ---
 class ConnectionManager:
-	def __init__(self):
-		self.active_connections: Dict[str, dict] = {}  # Cambiar a dict para almacenar websocket y username
-		self.streamer_id: Optional[str] = None
-		self.current_consecutive_id: Optional[int] = None
+    def __init__(self):
+        self.active_connections: Dict[str, dict] = {}  # Almacenar dict con websocket y username
+        self.streamer_id: Optional[str] = None
+        self.current_consecutive_id: Optional[int] = None
 
-	async def connect(self, websocket: WebSocket) -> str:
-		await websocket.accept()
-		client_id = str(uuid.uuid4())
-		self.active_connections[client_id] = {"websocket": websocket, "username": None}	 # Inicializar con username None
-		logger.info(f"Nuevo cliente conectado con ID: {client_id}")
-		await self.broadcast_json({"type": "usuarios_conectados", "payload": len(self.active_connections)})
-		if self.current_consecutive_id is not None:
-			await self.send_personal_json(
-				{"type": "juego_numero", "payload": self.current_consecutive_id},
-				client_id
-			)
-		return client_id
+    async def connect(self, websocket: WebSocket) -> str:
+        await websocket.accept()
+        client_id = str(uuid.uuid4())
+        self.active_connections[client_id] = {"websocket": websocket, "username": None}  # Inicializar con username None
+        logger.info(f"Nuevo cliente conectado con ID: {client_id}")
+        await self.broadcast_json({"type": "usuarios_conectados", "payload": len(self.active_connections)})
+        if self.current_consecutive_id is not None:
+            await self.send_personal_json(
+                {"type": "juego_numero", "payload": self.current_consecutive_id},
+                client_id
+            )
+        return client_id
 
-	def disconnect(self, client_id: str):
-		global streamer_ws
-		global streamer_is_active
-		if client_id in self.active_connections:
-			username = self.active_connections[client_id]["username"]
-			del self.active_connections[client_id]
-			logger.info(f"Cliente {client_id} ({username}) desconectado.")
-			# Notificar al streamer si un espectador se desconecta
-			if client_id != self.streamer_id and self.streamer_id:
-				loop = asyncio.get_event_loop()
-				if loop.is_running():
-					loop.create_task(self.send_personal_json(
-						{"type": "viewer_disconnected", "viewer_id": username},	 # Usar username
-						self.streamer_id
-					))
-		if client_id == self.streamer_id:
-			logger.info("El streamer se ha desconectado.")
-			streamer_ws = None
-			streamer_is_active = False
-			self.streamer_id = None
-			loop = asyncio.get_event_loop()
-			if loop.is_running():
-				loop.create_task(self.broadcast_json({"type": "stream_ended"}))
-		loop = asyncio.get_event_loop()
-		if loop.is_running():
-			loop.create_task(self.broadcast_json({"type": "usuarios_conectados", "payload": len(self.active_connections)}))
+    def disconnect(self, client_id: str):
+        global streamer_ws
+        global streamer_is_active
+        if client_id in self.active_connections:
+            username = self.active_connections[client_id]["username"]
+            del self.active_connections[client_id]
+            logger.info(f"Cliente {client_id} ({username}) desconectado.")
+            # Notificar al streamer si un espectador se desconecta
+            if client_id != self.streamer_id and self.streamer_id and username:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self.send_personal_json(
+                        {"type": "viewer_disconnected", "viewer_id": username},
+                        self.streamer_id
+                    ))
+        if client_id == self.streamer_id:
+            logger.info("El streamer se ha desconectado.")
+            streamer_ws = None
+            streamer_is_active = False
+            self.streamer_id = None
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.broadcast_json({"type": "stream_ended"}))
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(self.broadcast_json({"type": "usuarios_conectados", "payload": len(self.active_connections)}))
 
-	async def broadcast_json(self, data: dict):
-		message = json.dumps(data)
-		for client_id, info in list(self.active_connections.items()):
-			try:
-				await info["websocket"].send_text(message)
-			except Exception as e:
-				logger.error(f"Error enviando mensaje a {client_id}: {str(e)}")
-				self.disconnect(client_id)
+    async def broadcast_json(self, data: dict):
+        message = json.dumps(data)
+        for client_id, info in list(self.active_connections.items()):
+            try:
+                await info["websocket"].send_text(message)
+            except Exception as e:
+                logger.error(f"Error enviando mensaje a {client_id}: {str(e)}")
+                self.disconnect(client_id)
 
-	async def send_personal_json(self, data: dict, client_id: str):
-		if client_id in self.active_connections:
-			try:
-				await self.active_connections[client_id]["websocket"].send_text(json.dumps(data))
-			except Exception as e:
-				logger.error(f"Error enviando mensaje personal a {client_id}: {str(e)}")
-				self.disconnect(client_id)
-
+    async def send_personal_json(self, data: dict, client_id: str):
+        if client_id in self.active_connections:
+            try:
+                await self.active_connections[client_id]["websocket"].send_text(json.dumps(data))
+            except Exception as e:
+                logger.error(f"Error enviando mensaje personal a {client_id}: {str(e)}")
+                self.disconnect(client_id)
 
 manager = ConnectionManager()
 
@@ -191,11 +190,15 @@ async def websocket_users(websocket: WebSocket):
 					logger.error(f"Cliente {client_id} intentó autenticarse sin nombre")
 					return
 
-				# Almacenar mapeo de client_id a username
-				manager.clients[client_id] = {"websocket": websocket, "username": username}
+				# Almacenar username en active_connections
+				if client_id in manager.active_connections:
+					manager.active_connections[client_id]["username"] = username
+				else:
+					logger.error(f"Cliente {client_id} no encontrado en active_connections")
+					return
 
 				if username == STREAMER_USERNAME:  # "mario"
-					manager.streamer_id = username	# Usar username en lugar de client_id
+					manager.streamer_id = username  # Usar username como streamer_id
 					global streamer_ws
 					global streamer_is_active
 					streamer_ws = websocket
@@ -203,15 +206,15 @@ async def websocket_users(websocket: WebSocket):
 					await websocket.send_text(json.dumps({
 						"type": "login_success",
 						"role": "streamer",
-						"streamer_id": username,  # Enviar username como streamer_id
-						"client_id": username	   # Enviar username como client_id
+						"streamer_id": username,
+						"client_id": username
 					}))
 					logger.info(f"Cliente {client_id} autenticado como streamer: {username}")
 				else:
 					response = {
 						"type": "login_success",
 						"role": "viewer",
-						"client_id": username  # Enviar username como client_id
+						"client_id": username
 					}
 					if manager.streamer_id:
 						response["streamer_id"] = manager.streamer_id
@@ -222,7 +225,7 @@ async def websocket_users(websocket: WebSocket):
 					if manager.streamer_id and streamer_ws and streamer_is_active:
 						await manager.send_personal_json({
 							"type": "viewer_joined",
-							"viewer_id": username  # Enviar username como viewer_id
+							"viewer_id": username
 						}, manager.streamer_id)
 						logger.info(f"Notificado al streamer {manager.streamer_id} sobre nuevo viewer: {username}")
 			
@@ -236,6 +239,7 @@ async def websocket_users(websocket: WebSocket):
 						break
 				if target_client_id:
 					await manager.send_personal_json(data, target_client_id)
+					logger.info(f"Mensaje {msg_type} enviado de {data.get('from_id')} a {target_id}")
 				else:
 					logger.error(f"No se encontró cliente con username: {target_id}")
 

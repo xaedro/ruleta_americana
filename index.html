@@ -363,7 +363,8 @@
 			case 'login_success':
 				userRole = data.role;
 				streamerId = data.streamer_id || '';
-				console.log(`Rol asignado: ${userRole}, Streamer ID: ${streamerId}`);
+				currentUsername = data.client_id || currentUsername;
+				console.log(`Rol asignado: ${userRole}, Streamer ID: ${streamerId}, Client ID: ${currentUsername}`);
 				loginContainer.style.display = 'none';
 				welcomeContainer.style.display = 'block';
 				nombreLogueadoElem.textContent = currentUsername;
