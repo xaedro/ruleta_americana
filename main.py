@@ -318,7 +318,6 @@ async def websocket_users(websocket: WebSocket):
 		manager.disconnect(client_id)
 """
 
-```python
 import asyncio
 import json
 import logging
@@ -662,4 +661,3 @@ async def websocket_users(websocket: WebSocket):
     except Exception as e:
         logger.error(f"Error inesperado en WebSocket para {client_id}: {str(e)}")
         manager.disconnect(client_id)
-```
