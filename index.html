@@ -120,7 +120,7 @@
 	<div id="connected-users" class="game-info">Usuarios conectados: 0</div>
     <ul id="messages"></ul>
   </div>
-  <div id="datetime-div">Fecha y Hora: --/--/---- --:--:-- --</div>
+  <div id="datetime-div">--/--/---- --:--:-- --</div>
 
   <script>
     // Referencias al DOM
@@ -216,7 +216,7 @@
         const minutes = now.getMinutes().toString().padStart(2, '0');
         const seconds = now.getSeconds().toString().padStart(2, '0');
         const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
-        datetimeDiv.textContent = `Fecha: ${date} ${hours}:${minutes}:${seconds} ${ampm}`;
+        datetimeDiv.textContent = `${date} ${hours}:${minutes}:${seconds} ${ampm}`;
       }
 
       setInterval(updateDateTime, 1000);
