@@ -435,7 +435,7 @@
               break;
 
             case 'game_event':
-              console.log(`Evento de juego recibido: ${data.payload}`);
+              console.log(`Evento de juego recibido: ${data.content}`);
               const gameEventLi = document.createElement('li');
               //switch (data.payload) {
 			  switch (data.content) {

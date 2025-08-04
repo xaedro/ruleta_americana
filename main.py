@@ -299,7 +299,8 @@ async def websocket_users(websocket: WebSocket):
                 if client_id == manager.streamer_id:
                     manager.disconnect(client_id)
 
-            elif msg_type == "game_event" and client_id == manager.streamer_id:
+            #elif msg_type == "game_event" and client_id == manager.streamer_id:
+			elif msg_type == "game_event":
                 await manager.broadcast_json(data)
                 await websocket.send_text(json.dumps({"type": "ack", "event": data["content"]}))
                 logger.info(f"Confirmación enviada para {data['content']} a {client_id}")
