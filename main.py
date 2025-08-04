@@ -553,7 +553,7 @@ async def websocket_users(websocket: WebSocket):
                                 continue
                             else:
                                 logger.warning(f"Cliente {existing_client_id} envió mensaje inesperado: {data_received}")
-                                manager.disconnect(existing_client_id)
+                                #manager.disconnect(existing_client_id)
                     except asyncio.TimeoutError:
                         logger.info(f"Cliente {existing_client_id} no respondió al ping, desconectando")
                         manager.disconnect(existing_client_id)
