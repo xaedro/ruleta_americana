@@ -459,7 +459,8 @@
                   const { width, height, aspectRatio } = data.video_dimensions;
                   console.log(`[Viewer] Dimensiones recibidas: ${width}x${height}, Aspect Ratio: ${aspectRatio}`);
                   if (width > 0 && height > 0 && !isNaN(aspectRatio)) {
-                    videoContainer.style.width = `${width}px`;
+                    videoContainer.style.width = `1280px`;
+                    //videoContainer.style.width = `${width}px`;
                     videoContainer.style.aspectRatio = aspectRatio;
                   } else {
                     console.warn("Dimensiones inválidas recibidas:", data.video_dimensions);
