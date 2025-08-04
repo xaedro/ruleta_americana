@@ -495,9 +495,9 @@
 			  winningNumberElem.textContent = `Número ganador: ${data.numero}`;
 			  break;
 
-            case 'apuesta':
-			  console.log(`Apuesta de ${data.payload.username}: ${data.payload.numero}`);
-			  latestBetElem.textContent = `Última apuesta: ${data.payload.username}: ${data.payload.numero}`;
+            case 'apuesta': type:
+			  console.log(`Apuesta de ${data.username}: ${data.numero}`);
+			  latestBetElem.textContent = `Última apuesta: ${data.username}: ${data.numero}`;
 			  break;
             case 'usuarios_conectados':
 				  console.log("Usuarios conectados:", data.payload, "Nombres:", data.usernames || "No disponibles");
