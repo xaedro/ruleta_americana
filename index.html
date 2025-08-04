@@ -346,11 +346,13 @@
         console.log("Conectado al servidor. WebSocket está en estado OPEN.");
         ws.send(JSON.stringify({ type: "login", name: username }));
         retryCount = 0;
-        heartbeatInterval = setInterval(() => {
+        /*
+		heartbeatInterval = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'ping' }));
           }
         }, 10000);
+		*/
       };
 
       ws.onmessage = async (event) => {
@@ -435,7 +437,8 @@
             case 'game_event':
               console.log(`Evento de juego recibido: ${data.payload}`);
               const gameEventLi = document.createElement('li');
-              switch (data.payload) {
+              //switch (data.payload) {
+			  switch (data.content) {
                 case 'game_started':
                   console.log('game_started');
                   gameEventLi.textContent = "El juego ha comenzado";
