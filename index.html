@@ -460,7 +460,7 @@
                   btnEnviarApuesta.disabled = true;
                   break;
                 default:
-                  gameEventLi.textContent = `Evento desconocido: ${data.payload}`;
+                  gameEventLi.textContent = `Evento desconocido: ${data.content}`;
               }
               messagesElem.appendChild(gameEventLi);
               break;
