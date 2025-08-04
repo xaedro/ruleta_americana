@@ -463,12 +463,12 @@
                     videoContainer.style.aspectRatio = aspectRatio;
                   } else {
                     console.warn("Dimensiones inválidas recibidas:", data.video_dimensions);
-                    videoContainer.style.width = '640px';
+                    videoContainer.style.width = '800px';
                     videoContainer.style.aspectRatio = '4/3';
                   }
                 } else {
                   console.warn("No se recibieron dimensiones en stream_started.");
-                  videoContainer.style.width = '640px';
+                  videoContainer.style.width = '800px';
                   videoContainer.style.aspectRatio = '4/3';
                 }
               }
