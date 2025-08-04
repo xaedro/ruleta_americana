@@ -82,6 +82,7 @@
       width: 200px;
       text-align: center;
       line-height: 1.5;
+	  touch-action: none; /* Evita el desplazamiento de la página al tocar el div */
     }
   </style>
 </head>
@@ -253,6 +254,36 @@
         datetimeDiv.style.cursor = 'move';
       });
 
+		// Manejo de eventos táctiles
+      datetimeDiv.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) { // Solo manejar un dedo
+          isDragging = true;
+          const rect = datetimeDiv.getBoundingClientRect();
+          currentX = rect.left;
+          currentY = rect.top;
+          initialX = e.touches[0].clientX - currentX;
+          initialY = e.touches[0].clientY - currentY;
+          datetimeDiv.style.cursor = 'grabbing';
+        }
+      });
+
+      document.addEventListener('touchmove', (e) => {
+        if (isDragging && e.touches.length === 1) {
+          e.preventDefault(); // Evitar desplazamiento de la página
+          currentX = e.touches[0].clientX - initialX;
+          currentY = e.touches[0].clientY - initialY;
+          datetimeDiv.style.left = `${currentX}px`;
+          datetimeDiv.style.top = `${currentY}px`;
+          datetimeDiv.style.transform = 'none';
+        }
+      });
+
+      document.addEventListener('touchend', () => {
+        isDragging = false;
+        datetimeDiv.style.cursor = 'move';
+      });
+	  
+	  
       function centerDiv() {
         const windowWidth = window.innerWidth;
         const divWidth = datetimeDiv.offsetWidth;
