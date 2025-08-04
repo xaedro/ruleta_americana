@@ -299,36 +299,32 @@ async def websocket_users(websocket: WebSocket):
 				if client_id == manager.streamer_id:
 					manager.disconnect(client_id)
 
-			#elif msg_type == "game_event" and client_id == manager.streamer_id:
-			elif msg_type == "game_event":
+			elif msg_type == "game_event"  and data.get("source") == "blender":
 				await manager.broadcast_json(data)
 				await websocket.send_text(json.dumps({"type": "ack", "event": data["content"]}))
 				logger.info(f"Confirmación enviada para {data['content']} a {client_id}")
 
 			elif msg_type == "fecha_hora":
-				if client_id == manager.streamer_id:
-					await manager.broadcast_json({
-						"type": "fecha_hora",
-						"payload": data.get("fecha_hora_str")
-					})
-					logger.info(f"Fecha y hora enviada por {client_id}: {data.get('fecha_hora_str')}")
+				await manager.broadcast_json({
+					"type": "fecha_hora",
+					"payload": data.get("fecha_hora_str")
+				})
+				logger.info(f"Fecha y hora enviada por {client_id}: {data.get('fecha_hora_str')}")
 
-			elif msg_type == "consecutivo_juego":
-				if client_id == manager.streamer_id:
-					manager.current_consecutive_id = data.get("consecutive_id")
-					await manager.broadcast_json({
-						"type": "juego_numero",
-						"payload": data.get("consecutive_id")
-					})
-					logger.info(f"Consecutivo enviado por {client_id}: {data.get('consecutive_id')}")
+			elif msg_type == "consecutivo_juego" and data.get("source") == "blender":
+				manager.current_consecutive_id = data.get("consecutive_id")
+				await manager.broadcast_json({
+					"type": "juego_numero",
+					"payload": data.get("consecutive_id")
+				})
+				logger.info(f"Consecutivo enviado por {client_id}: {data.get('consecutive_id')}")
 
-			elif msg_type == "numero_caido":
-				if client_id == manager.streamer_id:
-					await manager.broadcast_json({
-						"type": "numero_caido",
-						"payload": data.get("numero")
-					})
-					logger.info(f"Número caído enviado por {client_id}: {data.get('numero')}")
+			elif msg_type == "numero_caido" and data.get("source") == "blender":
+				await manager.broadcast_json({
+					"type": "numero_caido",
+					"payload": data.get("numero")
+				})
+				logger.info(f"Número caído enviado por {client_id}: {data.get('numero')}")
 
 			elif msg_type == "apuesta":
 				await manager.broadcast_json(data)
