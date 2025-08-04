@@ -32,6 +32,14 @@
       font-size: 1.5em;
       text-align: center;
     }
+	.game-info {
+	  margin: 10px 0;
+	  padding: 10px;
+	  border: 1px solid #ccc;
+	  border-radius: 5px;
+	  background-color: #f9f9f9;
+	  text-align: center;
+	}
     #welcome-container {
       display: none;
       text-align: center;
@@ -104,6 +112,11 @@
       <input type="number" id="apuesta" placeholder="Número de apuesta" autocomplete="off" min="0" max="36" required/>
       <button id="btnEnviarApuesta" disabled>Enviar</button>
     </form>
+	<div id="game-status" class="game-info">Estado del juego: Esperando...</div>
+	<div id="game-number" class="game-info">Consecutivo del juego: -</div>
+	<div id="winning-number" class="game-info">Número ganador: -</div>
+	<div id="latest-bet" class="game-info">Última apuesta: -</div>
+	<div id="connected-users" class="game-info">Usuarios conectados: 0</div>
     <ul id="messages"></ul>
   </div>
   <div id="datetime-div">Fecha y Hora: --/--/---- --:--:-- --</div>
@@ -125,7 +138,12 @@
     const enterGameButton = document.getElementById('enter-game-button');
     const videoContainer = document.querySelector('.video-container');
     const datetimeDiv = document.getElementById('datetime-div');
-
+	const gameStatusElem = document.getElementById('game-status');
+	const gameNumberElem = document.getElementById('game-number');
+	const winningNumberElem = document.getElementById('winning-number');
+	const latestBetElem = document.getElementById('latest-bet');
+	const connectedUsersElem = document.getElementById('connected-users');
+	
     // Estado Global y Configuración
     let ws = null;
     let userRole = "viewer";
@@ -435,35 +453,32 @@
               break;
 
             case 'game_event':
-              console.log(`Evento de juego recibido: ${data.content}`);
-              const gameEventLi = document.createElement('li');
-              //switch (data.payload) {
+			  console.log(`Evento de juego recibido: ${data.content}`);
 			  switch (data.content) {
-                case 'game_started':
-                  console.log('game_started');
-                  gameEventLi.textContent = "El juego ha comenzado";
-                  btnEnviarApuesta.disabled = false;
-                  break;
-                case 'game_ended':
-                  console.log('game_ended');
-                  gameEventLi.textContent = "El juego ha terminado";
-                  btnEnviarApuesta.disabled = true;
-                  break;
-                case 'bets_open':
-                  console.log('bets_open');
-                  gameEventLi.textContent = "Apuestas abiertas";
-                  btnEnviarApuesta.disabled = false;
-                  break;
-                case 'bets_closed':
-                  console.log('bets_closed');
-                  gameEventLi.textContent = "Apuestas cerradas";
-                  btnEnviarApuesta.disabled = true;
-                  break;
-                default:
-                  gameEventLi.textContent = `Evento desconocido: ${data.content}`;
-              }
-              messagesElem.appendChild(gameEventLi);
-              break;
+				case 'game_started':
+				  console.log('game_started');
+				  gameStatusElem.textContent = "Estado del juego: El juego ha comenzado";
+				  btnEnviarApuesta.disabled = false;
+				  break;
+				case 'game_ended':
+				  console.log('game_ended');
+				  gameStatusElem.textContent = "Estado del juego: El juego ha terminado";
+				  btnEnviarApuesta.disabled = true;
+				  break;
+				case 'bets_open':
+				  console.log('bets_open');
+				  gameStatusElem.textContent = "Estado del juego: Apuestas abiertas";
+				  btnEnviarApuesta.disabled = false;
+				  break;
+				case 'bets_closed':
+				  console.log('bets_closed');
+				  gameStatusElem.textContent = "Estado del juego: Apuestas cerradas";
+				  btnEnviarApuesta.disabled = true;
+				  break;
+				default:
+				  console.warn(`Evento desconocido: ${data.content}`);
+			  }
+			  break;
 
             case 'fecha_hora':
               console.log("Fecha y hora:", data.payload);
@@ -471,47 +486,31 @@
               break;
 
             case 'juego_numero':
-              console.log("Consecutivo del juego:", data.payload);
-              const consecutivoLi = document.createElement('li');
-              consecutivoLi.textContent = `Consecutivo: ${data.payload}`;
-              messagesElem.appendChild(consecutivoLi);
-              break;
+			  console.log("Consecutivo del juego:", data.payload);
+			  gameNumberElem.textContent = `Consecutivo del juego: ${data.payload}`;
+			  break;
 
             case 'numero_caido':
-              console.log("Número ganador:", data.payload);
-              const numeroLi = document.createElement('li');
-              numeroLi.textContent = `Número caído: ${data.payload}`;
-              messagesElem.appendChild(numeroLi);
-              break;
+			  console.log("Número ganador:", data.numero);
+			  winningNumberElem.textContent = `Número ganador: ${data.numero}`;
+			  break;
 
             case 'apuesta':
-              console.log(`Apuesta de ${data.payload.username}: ${data.payload.numero}`);
-              const apuestaLi = document.createElement('li');
-              apuestaLi.textContent = `Apuesta de ${data.payload.username}: ${data.payload.numero}`;
-              messagesElem.appendChild(apuestaLi);
-              break;
-            /*
+			  console.log(`Apuesta de ${data.payload.username}: ${data.payload.numero}`);
+			  latestBetElem.textContent = `Última apuesta: ${data.payload.username}: ${data.payload.numero}`;
+			  break;
             case 'usuarios_conectados':
-              console.log("Usuarios conectados:", data.payload);
-              const usuariosLi = document.createElement('li');
-              usuariosLi.textContent = `Usuarios conectados: ${data.payload}`;
-              messagesElem.appendChild(usuariosLi);
-              break;
-            */
-            case 'usuarios_conectados':
-				console.log("Usuarios conectados:", data.payload, "Nombres:", data.usernames || "No disponibles");
-				const usuariosLi = document.createElement('li');
-				let messageText = `Usuarios conectados: ${data.payload}`;
-				if (data.usernames && data.usernames.length > 0) {
+				  console.log("Usuarios conectados:", data.payload, "Nombres:", data.usernames || "No disponibles");
+				  let messageText = `Usuarios conectados: ${data.payload}`;
+				  if (data.usernames && data.usernames.length > 0) {
 					messageText += ` (${data.usernames.join(', ')}`;
 					if (data.payload > data.usernames.length) {
-						messageText += ', ...';
+					  messageText += ', ...';
 					}
 					messageText += ')';
-				}
-				usuariosLi.textContent = messageText;
-				messagesElem.appendChild(usuariosLi);
-				break;
+				  }
+				  connectedUsersElem.textContent = messageText;
+				  break;
             case 'offer':
               if (userRole === 'streamer') {
                 console.log(`Oferta recibida de ${data.from_id}`);
