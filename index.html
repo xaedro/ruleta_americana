@@ -186,6 +186,26 @@
 	
     // Manejo de Fecha y Hora local
     document.addEventListener('DOMContentLoaded', () => {
+      // Función para detectar si es un dispositivo móvil
+      function isMobileDevice() {
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent) || window.innerWidth < 768;
+      }
+	  
+	   // Función para ajustar estilos de datetime-div según el dispositivo
+      function adjustDateTimeStyles() {
+        if (isMobileDevice()) {
+          datetimeDiv.style.fontSize = '14px';
+          datetimeDiv.style.width = '150px';
+          datetimeDiv.style.padding = '8px 16px';
+        } else {
+          datetimeDiv.style.fontSize = '20px';
+          datetimeDiv.style.width = '200px';
+          datetimeDiv.style.padding = '10px 20px';
+        }
+      }
+	  
+	  
       function updateDateTime() {
         const now = new Date();
         const date = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
