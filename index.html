@@ -204,7 +204,9 @@
           datetimeDiv.style.padding = '10px 20px';
         }
       }
-	  
+	  // Actualizar estilos inicialmente y al redimensionar
+      adjustDateTimeStyles();
+      window.addEventListener('resize', adjustDateTimeStyles);
 	  
       function updateDateTime() {
         const now = new Date();
