@@ -170,7 +170,6 @@ async def websocket_users(websocket: WebSocket):
 			if msg_type == "ping":
 				await websocket.send_text(json.dumps({"type": "pong"}))
 				continue
-
 			elif msg_type == "login":
 				username = data.get("name")
 				if not username:
@@ -180,32 +179,108 @@ async def websocket_users(websocket: WebSocket):
 					}))
 					logger.error(f"Cliente {client_id} intentó autenticarse sin nombre")
 					continue
+				
+				# Bandera de control de flujo
+				abort_login = False
 
-				# Verificar si el username ya está en uso
+				# 1. Verificar si el username ya está en uso por OTRA conexión
 				existing_client_id = None
 				for cid, info in manager.active_connections.items():
-					if info["username"] == username:
+					# ¡Importante!: Asegurarse de que no nos chequeamos a nosotros mismos
+					if info["username"] == username and cid != client_id: 
 						existing_client_id = cid
 						break
 
-				if existing_client_id and existing_client_id != client_id:
-					# Enviar ping para verificar si la conexión existente está activa
+				if existing_client_id:
+					# Duplicado encontrado, intentar ping/limpieza
 					try:
+						# Verificar si la conexión existente está activa
 						await manager.active_connections[existing_client_id]["websocket"].send_text(json.dumps({"type": "ping"}))
 						async with asyncio.timeout(5):
 							message = await manager.active_connections[existing_client_id]["websocket"].receive_text()
 							data_received = json.loads(message)
+
 							if data_received.get("type") != "pong":
 								logger.warning(f"Cliente {existing_client_id} envió mensaje inesperado en lugar de pong: {data_received}")
 								manager.disconnect(existing_client_id)
 							else:
-								# Conexión activa, enviar error
+								# Conexión activa, enviar error al nuevo cliente
 								await websocket.send_text(json.dumps({
 									"type": "error",
 									"message": f"Ya estás logueado con el nombre '{username}'"
 								}))
 								logger.error(f"Cliente {client_id} intentó usar nombre duplicado: {username}")
-								continue
+								abort_login = True
+								
+					except asyncio.TimeoutError:
+						logger.error(f"Cliente {existing_client_id} no respondió al ping, desconectando")
+						manager.disconnect(existing_client_id)
+					except Exception as e:
+						logger.error(f"Error en ping para {existing_client_id}: {str(e)}")
+						manager.disconnect(existing_client_id)
+					
+					# 2. Re-verificar (por si la limpieza falló o el cliente activo no respondió al ping)
+					is_duplicate_still_active = False
+					for cid, info in manager.active_connections.items():
+						if info["username"] == username and cid != client_id:
+							is_duplicate_still_active = True
+							break
+					
+					if is_duplicate_still_active:
+						await websocket.send_text(json.dumps({
+							"type": "error",
+							"message": f"Ya estás logueado con el nombre '{username}'"
+						}))
+						logger.error(f"Cliente {client_id} intentó usar nombre duplicado tras limpieza: {username}")
+						abort_login = True
+
+				# Si la bandera abort_login es True (se envió un error)
+				if abort_login:
+					continue # <-- ÚNICO continue: Salta al siguiente ciclo del while True
+				
+				# Continúa la autenticación (Asignar username)
+				if client_id in manager.active_connections:
+					manager.active_connections[client_id]["username"] = username
+				else:
+					logger.error(f"Cliente {client_id} no encontrado en active_connections")
+					continue
+				"""
+				elif msg_type == "login":
+					username = data.get("name")
+					if not username:
+						await websocket.send_text(json.dumps({
+							"type": "error",
+							"message": "Nombre de usuario requerido"
+						}))
+						logger.error(f"Cliente {client_id} intentó autenticarse sin nombre")
+						continue
+
+					# Verificar si el username ya está en uso
+					existing_client_id = None
+					for cid, info in manager.active_connections.items():
+						if info["username"] == username:
+							existing_client_id = cid
+							break
+
+					if existing_client_id and existing_client_id != client_id:
+						# Enviar ping para verificar si la conexión existente está activa
+						try:
+							await manager.active_connections[existing_client_id]["websocket"].send_text(json.dumps({"type": "ping"}))
+							async with asyncio.timeout(5):
+								message = await manager.active_connections[existing_client_id]["websocket"].receive_text()
+								data_received = json.loads(message)
+								if data_received.get("type") != "pong":
+									logger.warning(f"Cliente {existing_client_id} envió mensaje inesperado en lugar de pong: {data_received}")
+									manager.disconnect(existing_client_id)
+								else:
+									# Conexión activa, enviar error
+									await websocket.send_text(json.dumps({
+										"type": "error",
+										"message": f"Ya estás logueado con el nombre '{username}'"
+									}))
+									logger.error(f"Cliente {client_id} intentó usar nombre duplicado: {username}")
+									continue
+						"""
 					except asyncio.TimeoutError:
 						logger.error(f"Cliente {existing_client_id} no respondió al ping, desconectando")
 						manager.disconnect(existing_client_id)
