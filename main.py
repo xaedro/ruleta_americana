@@ -64,7 +64,8 @@ class ConnectionManager:
 		self.active_connections: Dict[str, dict] = {}
 		self.streamer_id: Optional[str] = None
 		self.current_consecutive_id: Optional[int] = None
-	
+		# NUEVO: Para guardar las dimensiones del video actual
+		self.stream_dimensions: dict = {} 
 	async def connect(self, websocket: WebSocket) -> str:
 		await websocket.accept()
 		client_id = str(uuid.uuid4())
@@ -182,14 +183,14 @@ async def websocket_users(websocket: WebSocket):
 				
 				# Bandera de control de flujo para evitar la autenticación
 				abort_login = False
-
+				
 				# 1. Verificar si el username ya está en uso por OTRA conexión
 				existing_client_id = None
 				for cid, info in manager.active_connections.items():
 					if info["username"] == username and cid != client_id: 
 						existing_client_id = cid
 						break
-
+				
 				if existing_client_id:
 					# Duplicado encontrado, intentar ping/limpieza
 					try:
@@ -198,7 +199,7 @@ async def websocket_users(websocket: WebSocket):
 						async with asyncio.timeout(5):
 							message = await manager.active_connections[existing_client_id]["websocket"].receive_text()
 							data_received = json.loads(message)
-
+							
 							if data_received.get("type") != "pong":
 								logger.warning(f"Cliente {existing_client_id} envió mensaje inesperado en lugar de pong: {data_received}")
 								manager.disconnect(existing_client_id)
@@ -232,7 +233,7 @@ async def websocket_users(websocket: WebSocket):
 						}))
 						logger.error(f"Cliente {client_id} intentó usar nombre duplicado tras limpieza: {username}")
 						abort_login = True
-
+				
 				# --- FIN DE LA LÓGICA DE DUPLICADOS ---
 				
 				# Si la bandera abort_login es True (se envió un error), salta al siguiente ciclo del while True.
@@ -276,16 +277,28 @@ async def websocket_users(websocket: WebSocket):
 						"client_id": username
 					}
 					if manager.streamer_id:
-						response["streamer_id"] = manager.streamer_id
+						response["streamer_id"] = manager.streamer_id # OJO: Aquí debe ser manager.streamer_id (el UUID) o el username según tu lógica corregida anterior.
+						# Si corregiste el login como te dije antes, manager.streamer_id es el UUID.
+						# Pero el cliente espera el ID para WebRTC. Asegúrate que coincida.
+						# Para simplificar y no romper nada:
+						response["streamer_id"] = manager.streamer_id 
+
 					await websocket.send_text(json.dumps(response))
 					logger.info(f"Cliente {client_id} autenticado como viewer: {username}")
+					
 					if manager.streamer_id and streamer_ws and streamer_is_active:
 						await manager.send_personal_json({
 							"type": "viewer_joined",
 							"viewer_id": username
 						}, manager.streamer_id)
 						logger.info(f"Notificado al streamer {manager.streamer_id} sobre nuevo viewer: {username}")
-						
+
+						# --- NUEVO BLOQUE: SI EL STREAM YA ESTÁ ACTIVO, AVISAR AL NUEVO USUARIO ---
+						logger.info(f"Stream activo detectado. Enviando stream_started a {client_id}")
+						await manager.send_personal_json({
+							"type": "stream_started",
+							"video_dimensions": manager.stream_dimensions
+						}, client_id)
 				await manager.broadcast_json({"type": "usuarios_conectados"})
 			elif msg_type == "pong":
 				logger.debug(f"Recibido pong de {client_id}")
@@ -307,6 +320,10 @@ async def websocket_users(websocket: WebSocket):
 			elif msg_type == "start_stream":
 				if client_id == manager.streamer_id:
 					streamer_is_active = True
+					
+					# NUEVO: Guardar las dimensiones en el manager
+					manager.stream_dimensions = data.get("video_dimensions", {})
+					
 					await manager.broadcast_json({
 						"type": "stream_started",
 						"video_dimensions": data.get("video_dimensions", {})
@@ -356,5 +373,32 @@ async def websocket_users(websocket: WebSocket):
 	except Exception as e:
 		logger.error(f"Error inesperado en WebSocket para {client_id}: {str(e)}")
 		manager.disconnect(client_id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
