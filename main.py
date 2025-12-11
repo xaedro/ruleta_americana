@@ -180,13 +180,12 @@ async def websocket_users(websocket: WebSocket):
 					logger.error(f"Cliente {client_id} intentó autenticarse sin nombre")
 					continue
 				
-				# Bandera de control de flujo
+				# Bandera de control de flujo para evitar la autenticación
 				abort_login = False
 
 				# 1. Verificar si el username ya está en uso por OTRA conexión
 				existing_client_id = None
 				for cid, info in manager.active_connections.items():
-					# ¡Importante!: Asegurarse de que no nos chequeamos a nosotros mismos
 					if info["username"] == username and cid != client_id: 
 						existing_client_id = cid
 						break
@@ -194,7 +193,7 @@ async def websocket_users(websocket: WebSocket):
 				if existing_client_id:
 					# Duplicado encontrado, intentar ping/limpieza
 					try:
-						# Verificar si la conexión existente está activa
+						# Verificar si la conexión existente está activa (Ping/Pong)
 						await manager.active_connections[existing_client_id]["websocket"].send_text(json.dumps({"type": "ping"}))
 						async with asyncio.timeout(5):
 							message = await manager.active_connections[existing_client_id]["websocket"].receive_text()
@@ -233,9 +232,12 @@ async def websocket_users(websocket: WebSocket):
 						}))
 						logger.error(f"Cliente {client_id} intentó usar nombre duplicado tras limpieza: {username}")
 						abort_login = True
-				# Si la bandera abort_login es True (se envió un error)
+
+				# --- FIN DE LA LÓGICA DE DUPLICADOS ---
+				
+				# Si la bandera abort_login es True (se envió un error), salta al siguiente ciclo del while True.
 				if abort_login:
-					continue # <-- ÚNICO continue: Salta al siguiente ciclo del while True
+					continue 
 				
 				# Continúa la autenticación (Asignar username)
 				if client_id in manager.active_connections:
@@ -243,31 +245,8 @@ async def websocket_users(websocket: WebSocket):
 				else:
 					logger.error(f"Cliente {client_id} no encontrado en active_connections")
 					continue
-					except asyncio.TimeoutError:
-						logger.error(f"Cliente {existing_client_id} no respondió al ping, desconectando")
-						manager.disconnect(existing_client_id)
-					except Exception as e:
-						logger.error(f"Error en ping para {existing_client_id}: {str(e)}")
-						manager.disconnect(existing_client_id)
-					# Re-verificar si el username sigue en uso tras la limpieza
-					for cid, info in manager.active_connections.items():
-						if info["username"] == username:
-							await websocket.send_text(json.dumps({
-								"type": "error",
-								"message": f"Ya estás logueado con el nombre '{username}'"
-							}))
-							logger.error(f"Cliente {client_id} intentó usar nombre duplicado tras limpieza: {username}")
-							continue
-
-				# Asignar username
-				if client_id in manager.active_connections:
-					manager.active_connections[client_id]["username"] = username
-				else:
-					logger.error(f"Cliente {client_id} no encontrado en active_connections")
-					continue
-				
-				# Código modificado en /ws/users, dentro de: if username == STREAMER_USERNAME:
-
+					
+				# Lógica de asignación de rol de Streamer
 				if username == STREAMER_USERNAME:
 					if manager.streamer_id:
 						await websocket.send_text(json.dumps({
@@ -276,11 +255,8 @@ async def websocket_users(websocket: WebSocket):
 						}))
 						logger.error(f"Cliente {client_id} intentó autenticarse como streamer, pero ya existe: {manager.streamer_id}")
 						continue
-					
-					# CORRECCIÓN CLAVE: Almacenar el client_id (UUID)
-					# en manager.streamer_id, NO el username.
-					manager.streamer_id = client_id
-					
+										
+					manager.streamer_id = client_id	
 					global streamer_ws
 					global streamer_is_active
 					streamer_ws = websocket
@@ -288,33 +264,11 @@ async def websocket_users(websocket: WebSocket):
 					await websocket.send_text(json.dumps({
 						"type": "login_success",
 						"role": "streamer",
-						# Se debe enviar el username (mario), no el UUID, al cliente
 						"streamer_id": username, 
 						"client_id": username 
 					}))
 					logger.info(f"Cliente {client_id} autenticado como streamer: {username}")
-					"""
-					if username == STREAMER_USERNAME:
-						if manager.streamer_id:
-							await websocket.send_text(json.dumps({
-								"type": "error",
-								"message": "Ya hay un streamer conectado con el nombre 'mario'"
-							}))
-							logger.error(f"Cliente {client_id} intentó autenticarse como streamer, pero ya existe: {manager.streamer_id}")
-							continue
-						manager.streamer_id = username
-						global streamer_ws
-						global streamer_is_active
-						streamer_ws = websocket
-						streamer_is_active = True
-						await websocket.send_text(json.dumps({
-							"type": "login_success",
-							"role": "streamer",
-							"streamer_id": username,
-							"client_id": username
-						}))
-						logger.info(f"Cliente {client_id} autenticado como streamer: {username}")
-					"""
+				# Lógica de asignación de rol de Viewer
 				else:
 					response = {
 						"type": "login_success",
@@ -331,9 +285,8 @@ async def websocket_users(websocket: WebSocket):
 							"viewer_id": username
 						}, manager.streamer_id)
 						logger.info(f"Notificado al streamer {manager.streamer_id} sobre nuevo viewer: {username}")
-
+						
 				await manager.broadcast_json({"type": "usuarios_conectados"})
-
 			elif msg_type == "pong":
 				logger.debug(f"Recibido pong de {client_id}")
 				continue
