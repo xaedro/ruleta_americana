@@ -229,7 +229,36 @@ async def websocket_users(websocket: WebSocket):
 				else:
 					logger.error(f"Cliente {client_id} no encontrado en active_connections")
 					continue
+				
+				# Código modificado en /ws/users, dentro de: if username == STREAMER_USERNAME:
 
+				if username == STREAMER_USERNAME:
+					if manager.streamer_id:
+						await websocket.send_text(json.dumps({
+							"type": "error",
+							"message": "Ya hay un streamer conectado con el nombre 'mario'"
+						}))
+						logger.error(f"Cliente {client_id} intentó autenticarse como streamer, pero ya existe: {manager.streamer_id}")
+						continue
+					
+					# CORRECCIÓN CLAVE: Almacenar el client_id (UUID)
+					# en manager.streamer_id, NO el username.
+					manager.streamer_id = client_id
+					
+					global streamer_ws
+					global streamer_is_active
+					streamer_ws = websocket
+					streamer_is_active = True
+					await websocket.send_text(json.dumps({
+						"type": "login_success",
+						"role": "streamer",
+						# Se debe enviar el username (mario), no el UUID, al cliente
+						"streamer_id": username, 
+						"client_id": username 
+					}))
+					logger.info(f"Cliente {client_id} autenticado como streamer: {username}")
+				
+				"""
 				if username == STREAMER_USERNAME:
 					if manager.streamer_id:
 						await websocket.send_text(json.dumps({
@@ -250,6 +279,7 @@ async def websocket_users(websocket: WebSocket):
 						"client_id": username
 					}))
 					logger.info(f"Cliente {client_id} autenticado como streamer: {username}")
+				"""
 				else:
 					response = {
 						"type": "login_success",
