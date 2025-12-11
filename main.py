@@ -358,12 +358,20 @@ async def websocket_users(websocket: WebSocket):
 				continue
 
 			# Eventos desde Blender
-			if msg_type == "game_event" and data.get("source") == "blender":
-				await manager.broadcast_json(data)
-				await websocket.send_text(json.dumps({"type": "ack", "event": data["content"]}))
-				logger.info(f"Confirmación enviada para {data['content']} a {client_id}")
-				continue
-
+			elif msg_type == "game_event":
+				username = manager.active_connections.get(client_id, {}).get("username")
+				
+				# Blender está autorizado a emitir cualquier evento del juego
+				if username == "blender" or data.get("source") == "blender":
+					await manager.broadcast_json(data)
+					await websocket.send_text(json.dumps({
+						"type": "ack",
+						"event": data.get("content")
+					}))
+					logger.info(f"Evento de juego recibido desde BLENDER ({client_id}): {data}")
+					continue
+					
+			
 			if msg_type == "fecha_hora":
 				await manager.broadcast_json({
 					"type": "fecha_hora",
