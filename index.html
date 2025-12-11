@@ -874,16 +874,37 @@
     }
 
     // Funciones de UI
+	/*
     function showStream() {
       liveStreamVideo.style.visibility = 'visible';
       streamPlaceholder.style.display = 'none';
     }
-
+	*/
+	// CORRECCIÓN RECOMENDADA
+	function showStream() {
+		console.log("-> LLAMANDO A showStream: Ocultando Placeholder y mostrando Video.");
+		
+		// 1. Ocultar el texto de espera (Placeholder)
+		streamPlaceholder.style.display = 'none'; 
+		
+		// 2. Mostrar el elemento de video como un bloque
+		liveStreamVideo.style.display = 'block'; 
+		// Aseguramos que la visibilidad también esté correcta
+		liveStreamVideo.style.visibility = 'visible'; 
+	}
+	/*
     function showPlaceholder(message) {
       liveStreamVideo.style.visibility = 'hidden';
       streamPlaceholder.textContent = message;
       streamPlaceholder.style.display = 'block';
     }
+	*/
+	// Asegúrate de que tu función showPlaceholder haga esto:
+	function showPlaceholder(message) {
+		liveStreamVideo.style.display = 'none'; // <-- CLAVE: Asegura que el video no ocupa espacio
+		streamPlaceholder.textContent = message;
+		streamPlaceholder.style.display = 'block';
+	}
   </script>
 </body>
 </html>
