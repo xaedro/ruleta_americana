@@ -163,7 +163,7 @@
         { urls: "stun:stun.l.google.com:19302" },
         {
           urls: "turn:relay1.expressturn.com:3478?transport=tcp",
-          username: "000000002069365339",
+          username: "000000002069365339", 
           credential: "UFUNfwsJ47YX6sDdFHuqnF9U99I="
         }
       ]
@@ -436,7 +436,8 @@
 			case 'login_success':
 				userRole = data.role;
 				streamerId = data.streamer_id || '';
-				currentUsername = data.client_id || currentUsername;
+				//currentUsername = data.client_id || currentUsername;
+				currentUsername = data.username || currentUsername;
 				console.log(`Rol asignado: ${userRole}, Streamer ID: ${streamerId}, Client ID: ${currentUsername}`);
 				loginContainer.style.display = 'none';
 				welcomeContainer.style.display = 'block';
