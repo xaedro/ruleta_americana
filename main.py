@@ -280,7 +280,7 @@ async def websocket_users(websocket: WebSocket):
 									}))
 									logger.error(f"Cliente {client_id} intentó usar nombre duplicado: {username}")
 									continue
-						"""
+				"""
 					except asyncio.TimeoutError:
 						logger.error(f"Cliente {existing_client_id} no respondió al ping, desconectando")
 						manager.disconnect(existing_client_id)
