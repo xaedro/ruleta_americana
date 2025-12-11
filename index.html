@@ -441,10 +441,16 @@
 				loginContainer.style.display = 'none';
 				welcomeContainer.style.display = 'block';
 				nombreLogueadoElem.textContent = currentUsername;
+				/*
 				if (userRole === 'viewer' && streamerId) {
 					console.log("Iniciando visualización para espectador con streamer_id:", streamerId);
 					startViewing();
 				} else if (!streamerId && userRole === 'viewer') {
+					console.warn("No se recibió streamer_id. No se puede iniciar visualización.");
+					showPlaceholder("No hay streamer disponible.");
+				}
+				*/
+				if (!streamerId && userRole === 'viewer') {
 					console.warn("No se recibió streamer_id. No se puede iniciar visualización.");
 					showPlaceholder("No hay streamer disponible.");
 				}
