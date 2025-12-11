@@ -265,8 +265,8 @@ async def websocket_users(websocket: WebSocket):
 					await websocket.send_text(json.dumps({
 						"type": "login_success",
 						"role": "streamer",
-						"streamer_id": username, 
-						"client_id": username 
+						"streamer_id": client_id, 
+						"client_id": client_id 
 					}))
 					logger.info(f"Cliente {client_id} autenticado como streamer: {username}")
 				# Lógica de asignación de rol de Viewer
@@ -274,13 +274,9 @@ async def websocket_users(websocket: WebSocket):
 					response = {
 						"type": "login_success",
 						"role": "viewer",
-						"client_id": username
+						"client_id": client_id
 					}
 					if manager.streamer_id:
-						response["streamer_id"] = manager.streamer_id # OJO: Aquí debe ser manager.streamer_id (el UUID) o el username según tu lógica corregida anterior.
-						# Si corregiste el login como te dije antes, manager.streamer_id es el UUID.
-						# Pero el cliente espera el ID para WebRTC. Asegúrate que coincida.
-						# Para simplificar y no romper nada:
 						response["streamer_id"] = manager.streamer_id 
 
 					await websocket.send_text(json.dumps(response))
@@ -303,7 +299,7 @@ async def websocket_users(websocket: WebSocket):
 			elif msg_type == "pong":
 				logger.debug(f"Recibido pong de {client_id}")
 				continue
-
+			
 			elif msg_type in ["offer", "answer", "candidate"]:
 				target_id = data.get("target_id")
 				target_client_id = None
