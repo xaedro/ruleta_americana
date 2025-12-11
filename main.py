@@ -2,6 +2,413 @@ import asyncio
 import json
 import logging
 import os
+from typing import Dict, Optional
+import uuid
+
+from fastapi import FastAPI, Request, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+app = FastAPI()
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- MIDDLEWARE DE PERMISOS ---
+class PermissionsPolicyMiddleware(BaseHTTPMiddleware):
+	async def dispatch(self, request: Request, call_next):
+		if request.url.path == "/cron":
+			user_agent = request.headers.get("User-Agent", "")
+			if "cron-job.org" not in user_agent.lower():
+				return {"status": "forbidden", "message": "Acceso denegado"}
+		response = await call_next(request)
+		response.headers['Permissions-Policy'] = 'display-capture=(self)'
+		return response
+
+# --- MIDDLEWARE DE CORS ---
+app.add_middleware(
+	CORSMiddleware,
+	allow_origins=["https://ruletaamericana.up.railway.app"],
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
+)
+
+app.add_middleware(PermissionsPolicyMiddleware)
+
+# Montar directorio estático
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# --- CONFIGURACIÓN Y ESTADO GLOBAL ---
+SECRET_KEY = "tu_clave_secreta_super_dificil"
+STREAMER_USERNAME = "mario"
+
+# streamer_ws y streamer_is_active como globals manejados en el flujo
+streamer_ws: Optional[WebSocket] = None
+streamer_is_active = False
+
+# --- CONNECTION MANAGER ---
+class ConnectionManager:
+	def __init__(self):
+		# client_uuid -> {"websocket": websocket, "username": username}
+		self.active_connections: Dict[str, dict] = {}
+		# UUID del streamer (client_id), no el username
+		self.streamer_id: Optional[str] = None
+		self.current_consecutive_id: Optional[int] = None
+		# Para guardar las dimensiones del video actual
+		self.stream_dimensions: dict = {}
+
+	async def connect(self, websocket: WebSocket) -> str:
+		await websocket.accept()
+		client_id = str(uuid.uuid4())
+		self.active_connections[client_id] = {"websocket": websocket, "username": None}
+		logger.info(f"Nuevo cliente conectado con ID: {client_id}, active_connections={len(self.active_connections)}")
+		if self.current_consecutive_id is not None:
+			await self.send_personal_json(
+				{"type": "juego_numero", "payload": self.current_consecutive_id},
+				client_id
+			)
+		return client_id
+
+	def disconnect(self, client_id: str):
+		global streamer_ws
+		global streamer_is_active
+
+		if client_id in self.active_connections:
+			username = self.active_connections[client_id]["username"]
+			del self.active_connections[client_id]
+			logger.info(f"Cliente {client_id} ({username}) desconectado, active_connections={len(self.active_connections)}")
+			logger.debug(f"active_connections: {[(cid, info['username']) for cid, info in self.active_connections.items()]}")
+			# Notificar al streamer si un viewer se desconectó
+			if client_id != self.streamer_id and self.streamer_id and username:
+				loop = asyncio.get_event_loop()
+				if loop.is_running():
+					loop.create_task(self.send_personal_json(
+						{"type": "viewer_disconnected", "viewer_id": username},
+						self.streamer_id
+					))
+
+		# Si quien se desconectó era el streamer, limpiar estado y notificar a viewers
+		if client_id == self.streamer_id:
+			logger.info("El streamer se ha desconectado.")
+			streamer_ws = None
+			streamer_is_active = False
+			self.streamer_id = None
+			loop = asyncio.get_event_loop()
+			if loop.is_running():
+				loop.create_task(self.broadcast_json({"type": "stream_ended"}))
+
+		# Actualizar lista de usuarios conectados a todos
+		loop = asyncio.get_event_loop()
+		if loop.is_running():
+			loop.create_task(self.broadcast_json({"type": "usuarios_conectados"}))
+
+	async def broadcast_json(self, data: dict):
+		message = data.copy()
+		if data.get("type") == "usuarios_conectados":
+			valid_connections = [
+				info for info in self.active_connections.values()
+				if info["username"] is not None
+			]
+			num_connections = len(valid_connections)
+			message["payload"] = num_connections
+			usernames = [info["username"] for info in valid_connections]
+			message["usernames"] = usernames[:10] if num_connections >= 11 else usernames
+			logger.info(f"Enviando usuarios_conectados: payload={num_connections}, usernames={usernames}")
+			logger.debug(f"active_connections: {[(cid, info['username']) for cid, info in self.active_connections.items()]}")
+
+		message_str = json.dumps(message)
+		for client_id, info in list(self.active_connections.items()):
+			try:
+				await info["websocket"].send_text(message_str)
+			except Exception as e:
+				logger.error(f"Error enviando mensaje a {client_id}: {str(e)}")
+				self.disconnect(client_id)
+
+	async def send_personal_json(self, data: dict, client_id: str):
+		if client_id in self.active_connections:
+			try:
+				await self.active_connections[client_id]["websocket"].send_text(json.dumps(data))
+			except Exception as e:
+				logger.error(f"Error enviando mensaje personal a {client_id}: {str(e)}")
+				self.disconnect(client_id)
+
+manager = ConnectionManager()
+
+# --- ENDPOINTS HTTP ---
+@app.get("/old")
+async def get_old_version():
+	return FileResponse(os.path.join(os.path.dirname(__file__), "index3.html"))
+
+@app.get("/")
+async def get_new_version():
+	return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"))
+
+@app.post("/stream_ended")
+async def notify_stream_ended(x_secret_key: Optional[str] = Header(None)):
+	if x_secret_key != SECRET_KEY:
+		raise HTTPException(status_code=403, detail="Clave secreta inválida")
+	if manager.streamer_id:
+		manager.disconnect(manager.streamer_id)
+	return {"status": "ok"}
+
+async def broadcast(message):
+	await manager.broadcast_json(message)
+
+# --- WEBSOCKET (SIGNALING) ---
+@app.websocket("/ws/users")
+async def websocket_users(websocket: WebSocket):
+	global streamer_is_active
+	global streamer_ws
+
+	client_id = await manager.connect(websocket)
+	try:
+		while True:
+			data_str = await websocket.receive_text()
+			data = json.loads(data_str)
+			msg_type = data.get("type")
+			logger.info(f"Mensaje recibido de {client_id}: {data}")
+
+			# ping/pong
+			if msg_type == "ping":
+				await websocket.send_text(json.dumps({"type": "pong"}))
+				continue
+
+			# LOGIN
+			if msg_type == "login":
+				username = data.get("name")
+				if not username:
+					await websocket.send_text(json.dumps({
+						"type": "error",
+						"message": "Nombre de usuario requerido"
+					}))
+					logger.error(f"Cliente {client_id} intentó autenticarse sin nombre")
+					continue
+
+				# Evitar duplicados: si otro client_id usa mismo username
+				abort_login = False
+				existing_client_id = None
+				for cid, info in manager.active_connections.items():
+					if info.get("username") == username and cid != client_id:
+						existing_client_id = cid
+						break
+
+				if existing_client_id:
+					# Intentar ping/limpieza en la conexión previa
+					try:
+						await manager.active_connections[existing_client_id]["websocket"].send_text(json.dumps({"type": "ping"}))
+						async with asyncio.timeout(5):
+							message = await manager.active_connections[existing_client_id]["websocket"].receive_text()
+							data_received = json.loads(message)
+							if data_received.get("type") != "pong":
+								logger.warning(f"Cliente {existing_client_id} envió mensaje inesperado en lugar de pong: {data_received}")
+								manager.disconnect(existing_client_id)
+							else:
+								# conexión previa activa: rechazar nuevo login
+								await websocket.send_text(json.dumps({
+									"type": "error",
+									"message": f"Ya estás logueado con el nombre '{username}'"
+								}))
+								logger.error(f"Cliente {client_id} intentó usar nombre duplicado: {username}")
+								abort_login = True
+					except asyncio.TimeoutError:
+						logger.error(f"Cliente {existing_client_id} no respondió al ping, desconectando")
+						manager.disconnect(existing_client_id)
+					except Exception as e:
+						logger.error(f"Error en ping para {existing_client_id}: {str(e)}")
+						manager.disconnect(existing_client_id)
+
+					# Re-verificar por si sigue activo
+					is_duplicate_still_active = False
+					for cid, info in manager.active_connections.items():
+						if info.get("username") == username and cid != client_id:
+							is_duplicate_still_active = True
+							break
+
+					if is_duplicate_still_active:
+						await websocket.send_text(json.dumps({
+							"type": "error",
+							"message": f"Ya estás logueado con el nombre '{username}'"
+						}))
+						logger.error(f"Cliente {client_id} intentó usar nombre duplicado tras limpieza: {username}")
+						abort_login = True
+
+				if abort_login:
+					continue
+
+				# Asignar username al client actual
+				if client_id in manager.active_connections:
+					manager.active_connections[client_id]["username"] = username
+				else:
+					logger.error(f"Cliente {client_id} no encontrado en active_connections")
+					continue
+
+				# Si es el streamer
+				if username == STREAMER_USERNAME:
+					if manager.streamer_id:
+						await websocket.send_text(json.dumps({
+							"type": "error",
+							"message": "Ya hay un streamer conectado con el nombre 'mario'"
+						}))
+						logger.error(f"Cliente {client_id} intentó autenticarse como streamer, pero ya existe: {manager.streamer_id}")
+						continue
+
+					# Marcar como streamer (usamos client_id UUID)
+					manager.streamer_id = client_id
+					streamer_ws = websocket
+					streamer_is_active = True
+
+					await websocket.send_text(json.dumps({
+						"type": "login_success",
+						"role": "streamer",
+						"streamer_id": client_id,
+						"client_id": client_id
+					}))
+					logger.info(f"Cliente {client_id} autenticado como streamer: {username}")
+
+				# Si es viewer
+				else:
+					response = {
+						"type": "login_success",
+						"role": "viewer",
+						"client_id": client_id
+					}
+					# Enviar UUID del streamer (si existe)
+					if manager.streamer_id:
+						response["streamer_id"] = manager.streamer_id
+
+					await websocket.send_text(json.dumps(response))
+					logger.info(f"Cliente {client_id} autenticado como viewer: {username}")
+
+					# Notificar al streamer que hay un nuevo viewer (enviamos username del viewer)
+					if manager.streamer_id and streamer_ws and streamer_is_active:
+						await manager.send_personal_json({
+							"type": "viewer_joined",
+							"viewer_id": username
+						}, manager.streamer_id)
+						logger.info(f"Notificado al streamer {manager.streamer_id} sobre nuevo viewer: {username}")
+
+						# Si el stream ya está activo, avisar al nuevo usuario
+						logger.info(f"Stream activo detectado. Enviando stream_started a {client_id}")
+						await manager.send_personal_json({
+							"type": "stream_started",
+							"video_dimensions": manager.stream_dimensions
+						}, client_id)
+
+				# Actualizar conteo usuarios
+				await manager.broadcast_json({"type": "usuarios_conectados"})
+				continue
+
+			# pong (debug)
+			if msg_type == "pong":
+				logger.debug(f"Recibido pong de {client_id}")
+				continue
+
+			# ofrertas/respuestas/candidatos WebRTC
+			if msg_type in ["offer", "answer", "candidate"]:
+				# Target puede ser UUID (client_id) o username. Primero intentamos por UUID.
+				target_identifier = data.get("target_id")
+				if not target_identifier:
+					logger.error(f"{msg_type} sin target_id desde {client_id}")
+					continue
+
+				target_client_id = None
+
+				# Si target_identifier parece ser un client_id existente (UUID) - mejor prioridad
+				if target_identifier in manager.active_connections:
+					target_client_id = target_identifier
+				else:
+					# fallback: buscar por username
+					for cid, info in manager.active_connections.items():
+						if info.get("username") == target_identifier:
+							target_client_id = cid
+							break
+
+				if target_client_id:
+					# Reenvío directo del mismo mensaje al client_id encontrado
+					await manager.send_personal_json(data, target_client_id)
+					logger.info(f"Mensaje {msg_type} reenviado desde {client_id} a {target_client_id} (target: {target_identifier})")
+				else:
+					logger.error(f"No se encontró cliente objetivo para {target_identifier} (mensaje {msg_type} desde {client_id})")
+				continue
+
+			# start_stream (de streamer)
+			if msg_type == "start_stream":
+				if client_id == manager.streamer_id:
+					streamer_is_active = True
+					# Guardar dimensiones
+					manager.stream_dimensions = data.get("video_dimensions", {})
+
+					await manager.broadcast_json({
+						"type": "stream_started",
+						"video_dimensions": data.get("video_dimensions", {})
+					})
+					logger.info("El streamer ha iniciado la transmisión.")
+				else:
+					logger.warning("start_stream recibido de cliente que no es streamer.")
+				continue
+
+			# stream_ended
+			if msg_type == "stream_ended":
+				if client_id == manager.streamer_id:
+					manager.disconnect(client_id)
+				continue
+
+			# Eventos desde Blender
+			if msg_type == "game_event" and data.get("source") == "blender":
+				await manager.broadcast_json(data)
+				await websocket.send_text(json.dumps({"type": "ack", "event": data["content"]}))
+				logger.info(f"Confirmación enviada para {data['content']} a {client_id}")
+				continue
+
+			if msg_type == "fecha_hora":
+				await manager.broadcast_json({
+					"type": "fecha_hora",
+					"payload": data.get("fecha_hora_str")
+				})
+				logger.info(f"Fecha y hora enviada por {client_id}: {data.get('fecha_hora_str')}")
+				continue
+
+			if msg_type == "consecutivo_juego" and data.get("source") == "blender":
+				manager.current_consecutive_id = data.get("consecutive_id")
+				await manager.broadcast_json({
+					"type": "juego_numero",
+					"payload": data.get("consecutive_id")
+				})
+				logger.info(f"Consecutivo enviado por {client_id}: {data.get('consecutive_id')}")
+				continue
+
+			if msg_type == "numero_caido" and data.get("source") == "blender":
+				await manager.broadcast_json({
+					"type": "numero_caido",
+					"payload": data.get("numero")
+				})
+				logger.info(f"Número caído enviado por {client_id}: {data.get('numero')}")
+				continue
+
+			if msg_type == "apuesta":
+				await manager.broadcast_json(data)
+				continue
+
+	except WebSocketDisconnect as e:
+		logger.info(f"Cliente {client_id} desconectado con código {getattr(e, 'code', 'n/a')}")
+		manager.disconnect(client_id)
+	except (ValueError, json.JSONDecodeError) as e:
+		logger.error(f"Error de formato de mensaje del cliente {client_id}: {str(e)}")
+		manager.disconnect(client_id)
+	except Exception as e:
+		logger.error(f"Error inesperado en WebSocket para {client_id}: {str(e)}")
+		manager.disconnect(client_id)
+
+
+"""
+import asyncio
+import json
+import logging
+import os
 from typing import cast, Dict, List, Optional
 import uuid
 
@@ -370,31 +777,4 @@ async def websocket_users(websocket: WebSocket):
 		logger.error(f"Error inesperado en WebSocket para {client_id}: {str(e)}")
 		manager.disconnect(client_id)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+"""
