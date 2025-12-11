@@ -257,29 +257,28 @@ async def websocket_users(websocket: WebSocket):
 						"client_id": username 
 					}))
 					logger.info(f"Cliente {client_id} autenticado como streamer: {username}")
-				
-				"""
-				if username == STREAMER_USERNAME:
-					if manager.streamer_id:
+					"""
+					if username == STREAMER_USERNAME:
+						if manager.streamer_id:
+							await websocket.send_text(json.dumps({
+								"type": "error",
+								"message": "Ya hay un streamer conectado con el nombre 'mario'"
+							}))
+							logger.error(f"Cliente {client_id} intentó autenticarse como streamer, pero ya existe: {manager.streamer_id}")
+							continue
+						manager.streamer_id = username
+						global streamer_ws
+						global streamer_is_active
+						streamer_ws = websocket
+						streamer_is_active = True
 						await websocket.send_text(json.dumps({
-							"type": "error",
-							"message": "Ya hay un streamer conectado con el nombre 'mario'"
+							"type": "login_success",
+							"role": "streamer",
+							"streamer_id": username,
+							"client_id": username
 						}))
-						logger.error(f"Cliente {client_id} intentó autenticarse como streamer, pero ya existe: {manager.streamer_id}")
-						continue
-					manager.streamer_id = username
-					global streamer_ws
-					global streamer_is_active
-					streamer_ws = websocket
-					streamer_is_active = True
-					await websocket.send_text(json.dumps({
-						"type": "login_success",
-						"role": "streamer",
-						"streamer_id": username,
-						"client_id": username
-					}))
-					logger.info(f"Cliente {client_id} autenticado como streamer: {username}")
-				"""
+						logger.info(f"Cliente {client_id} autenticado como streamer: {username}")
+					"""
 				else:
 					response = {
 						"type": "login_success",
